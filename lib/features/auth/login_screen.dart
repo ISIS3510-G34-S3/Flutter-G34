@@ -201,6 +201,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       )
                     : Row(
                         mainAxisAlignment: MainAxisAlignment.center,
+                        mainAxisSize: MainAxisSize.min,
                         children: [
                           Text(
                             'Log In',
@@ -261,12 +262,15 @@ class _LoginScreenState extends State<LoginScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              TextButton(
-                onPressed: _handlePrivacyPolicy,
-                child: Text(
-                  'Privacy Policy',
-                  style: AppTypography.bodySmall.copyWith(
-                    color: AppColors.textSecondary,
+              Flexible(
+                child: TextButton(
+                  onPressed: _handlePrivacyPolicy,
+                  child: Text(
+                    'Privacy Policy',
+                    style: AppTypography.bodySmall.copyWith(
+                      color: AppColors.textSecondary,
+                    ),
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
               ),
@@ -276,12 +280,15 @@ class _LoginScreenState extends State<LoginScreen> {
                 color: AppColors.divider,
                 margin: const EdgeInsets.symmetric(horizontal: 8),
               ),
-              TextButton(
-                onPressed: _handleTermsOfService,
-                child: Text(
-                  'Terms of Service',
-                  style: AppTypography.bodySmall.copyWith(
-                    color: AppColors.textSecondary,
+              Flexible(
+                child: TextButton(
+                  onPressed: _handleTermsOfService,
+                  child: Text(
+                    'Terms of Service',
+                    style: AppTypography.bodySmall.copyWith(
+                      color: AppColors.textSecondary,
+                    ),
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
               ),
