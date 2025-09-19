@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import '../../theme/colors.dart';
 import '../../theme/typography.dart';
 import '../../mock/mock_data.dart';
@@ -48,7 +49,7 @@ class ProfileScreen extends StatelessWidget {
           const SizedBox(height: 16),
 
           // Verification banner
-          if (!user.isVerified) _buildVerificationBanner(),
+          if (!user.isVerified) _buildVerificationBanner(context),
 
           const SizedBox(height: 16),
 
@@ -164,7 +165,7 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildVerificationBanner() {
+  Widget _buildVerificationBanner(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -205,6 +206,19 @@ class ProfileScreen extends StatelessWidget {
                   'Verify your identity to build trust with other users and unlock more features.',
                   style: AppTypography.bodySmall.copyWith(
                     color: AppColors.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () => context.pushNamed('profile-verification'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.oliveGold,
+                      foregroundColor: AppColors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                    child: const Text('Start Verification'),
                   ),
                 ),
               ],
