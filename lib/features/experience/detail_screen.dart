@@ -456,64 +456,6 @@ class ExperienceDetailScreen extends StatelessWidget {
   }
 
   void _bookExperience(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (context) => Container(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              'Book Experience',
-              style: AppTypography.titleMedium.copyWith(
-                color: AppColors.textPrimary,
-              ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Select your preferred date and number of guests',
-              style: AppTypography.bodyMedium.copyWith(
-                color: AppColors.textSecondary,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 24),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    child: const Text('Cancel'),
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: () {
-                      Navigator.of(context).pop();
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            'Booking request sent successfully!',
-                            style: AppTypography.bodyMedium.copyWith(
-                              color: AppColors.white,
-                            ),
-                          ),
-                          backgroundColor: AppColors.forestGreen,
-                        ),
-                      );
-                    },
-                    child: const Text('Confirm'),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
+    context.push('/booking/$experienceId');
   }
 }
