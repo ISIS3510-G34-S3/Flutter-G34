@@ -420,11 +420,12 @@ class _ProfileVerificationScreenState extends State<ProfileVerificationScreen> {
   Widget _buildIdVerificationContent() {
     return Column(
       children: [
+        // Government ID Upload
         GestureDetector(
           onTap: () {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
-                content: Text('Coming soon'),
+                content: Text('Government ID upload coming soon'),
                 duration: Duration(seconds: 2),
               ),
             );
@@ -450,7 +451,7 @@ class _ProfileVerificationScreenState extends State<ProfileVerificationScreen> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Upload ID Document',
+                  'Upload Government ID',
                   style: AppTypography.bodyMedium.copyWith(
                     color: AppColors.textSecondary,
                   ),
@@ -484,6 +485,158 @@ class _ProfileVerificationScreenState extends State<ProfileVerificationScreen> {
               Expanded(
                 child: Text(
                   'Accepted documents: Passport, National ID, Driver\'s License',
+                  style: AppTypography.bodySmall.copyWith(
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        
+        const SizedBox(height: 24),
+        
+        // Proof of Address Upload
+        GestureDetector(
+          onTap: () {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Proof of address upload coming soon'),
+                duration: Duration(seconds: 2),
+              ),
+            );
+          },
+          child: Container(
+            width: double.infinity,
+            height: 120,
+            decoration: BoxDecoration(
+              color: AppColors.peach.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: AppColors.divider,
+                style: BorderStyle.solid,
+              ),
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.cloud_upload_outlined,
+                  size: 32,
+                  color: AppColors.textSecondary,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Upload Proof of Address',
+                  style: AppTypography.bodyMedium.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'PDF, JPG, PNG (max 10MB)',
+                  style: AppTypography.bodySmall.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: AppColors.oliveGold.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                Icons.info_outline,
+                size: 20,
+                color: AppColors.oliveGold,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'Upload a recent utility bill, bank statement, or rental agreement showing your current address',
+                  style: AppTypography.bodySmall.copyWith(
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        const SizedBox(height: 24),
+
+        // Profile Photo Upload
+        GestureDetector(
+          onTap: () {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Profile photo upload coming soon'),
+                duration: Duration(seconds: 2),
+              ),
+            );
+          },
+          child: Container(
+            width: double.infinity,
+            height: 120,
+            decoration: BoxDecoration(
+              color: AppColors.peach.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: AppColors.divider,
+                style: BorderStyle.solid,
+              ),
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.cloud_upload_outlined,
+                  size: 32,
+                  color: AppColors.textSecondary,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Upload Profile Photo',
+                  style: AppTypography.bodyMedium.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'JPG, PNG (max 10MB)',
+                  style: AppTypography.bodySmall.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: AppColors.oliveGold.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                Icons.info_outline,
+                size: 20,
+                color: AppColors.oliveGold,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'Take or upload a clear photo of yourself for your profile',
                   style: AppTypography.bodySmall.copyWith(
                     color: AppColors.textPrimary,
                   ),
