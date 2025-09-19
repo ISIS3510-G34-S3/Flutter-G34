@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import '../features/auth/login_screen.dart';
 import '../features/explore/discover_screen.dart';
 import '../features/experience/detail_screen.dart';
+import '../features/experience/booking_screen.dart';
 import '../features/map/map_screen.dart';
 import '../features/create/create_experience_screen.dart';
 import '../features/profile/profile_screen.dart';
@@ -65,6 +66,16 @@ final GoRouter appRouter = GoRouter(
       builder: (context, state) {
         final experienceId = state.pathParameters['id']!;
         return ExperienceDetailScreen(experienceId: experienceId);
+      },
+    ),
+
+    // Booking route (standalone)
+    GoRoute(
+      path: '/booking/:experienceId',
+      name: 'booking',
+      builder: (context, state) {
+        final experienceId = state.pathParameters['experienceId']!;
+        return BookingScreen(experienceId: experienceId);
       },
     ),
 
