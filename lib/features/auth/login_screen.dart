@@ -322,17 +322,7 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   void _handleCreateAccount() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Text('Account creation coming soon!'),
-        backgroundColor: AppColors.forestGreen,
-        action: SnackBarAction(
-          label: 'OK',
-          textColor: AppColors.white,
-          onPressed: () {},
-        ),
-      ),
-    );
+    context.pushNamed('create-account');
   }
 
   void _handlePrivacyPolicy() {

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../features/auth/login_screen.dart';
+import '../features/auth/create_account_screen.dart';
 import '../features/explore/discover_screen.dart';
 import '../features/experience/detail_screen.dart';
 import '../features/experience/booking_screen.dart';
@@ -20,6 +21,13 @@ final GoRouter appRouter = GoRouter(
       path: '/login',
       name: 'login',
       builder: (context, state) => const LoginScreen(),
+    ),
+
+    // Create account route (standalone)
+    GoRoute(
+      path: '/create-account',
+      name: 'create-account',
+      builder: (context, state) => const CreateAccountScreen(),
     ),
 
     // Main app shell with bottom navigation
