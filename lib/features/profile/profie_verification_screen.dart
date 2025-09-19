@@ -159,40 +159,45 @@ class _ProfileVerificationScreenState extends State<ProfileVerificationScreen> {
               ),
 
               // Verification status
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 6,
-                ),
-                decoration: BoxDecoration(
-                  color: user.isVerified
-                      ? AppColors.forestGreen.withValues(alpha: 0.1)
-                      : AppColors.oliveGold.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      user.isVerified
-                          ? Icons.verified
-                          : Icons.schedule_outlined,
-                      size: 16,
-                      color: user.isVerified
-                          ? AppColors.forestGreen
-                          : AppColors.oliveGold,
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      user.isVerified ? 'Verified' : 'Pending',
-                      style: AppTypography.labelSmall.copyWith(
+              Flexible(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: user.isVerified
+                        ? AppColors.forestGreen.withValues(alpha: 0.1)
+                        : AppColors.oliveGold.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        user.isVerified
+                            ? Icons.verified
+                            : Icons.schedule_outlined,
+                        size: 16,
                         color: user.isVerified
                             ? AppColors.forestGreen
                             : AppColors.oliveGold,
-                        fontWeight: FontWeight.w600,
                       ),
-                    ),
-                  ],
+                      const SizedBox(width: 6),
+                      Flexible(
+                        child: Text(
+                          user.isVerified ? 'Verified' : 'Pending',
+                          style: AppTypography.labelSmall.copyWith(
+                            color: user.isVerified
+                                ? AppColors.forestGreen
+                                : AppColors.oliveGold,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ],
@@ -297,6 +302,8 @@ class _ProfileVerificationScreenState extends State<ProfileVerificationScreen> {
                               style: AppTypography.bodySmall.copyWith(
                                 color: AppColors.textSecondary,
                               ),
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 2,
                             ),
                           ],
                         ),
@@ -588,6 +595,7 @@ class _ProfileVerificationScreenState extends State<ProfileVerificationScreen> {
             borderRadius: BorderRadius.circular(8),
           ),
           child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
               Icon(
                 Icons.schedule_outlined,
@@ -601,6 +609,7 @@ class _ProfileVerificationScreenState extends State<ProfileVerificationScreen> {
                   color: AppColors.textPrimary,
                   fontWeight: FontWeight.w600,
                 ),
+                textAlign: TextAlign.center,
               ),
               const SizedBox(height: 8),
               Text(
@@ -609,6 +618,8 @@ class _ProfileVerificationScreenState extends State<ProfileVerificationScreen> {
                   color: AppColors.textSecondary,
                 ),
                 textAlign: TextAlign.center,
+                maxLines: 4,
+                overflow: TextOverflow.ellipsis,
               ),
             ],
           ),
@@ -666,7 +677,7 @@ class _ProfileVerificationScreenState extends State<ProfileVerificationScreen> {
   String _getNextButtonText() {
     switch (_currentStep) {
       case 0:
-        return 'Upload Document';
+        return 'Upload';
       case 1:
         return 'Send Code';
       case 2:
