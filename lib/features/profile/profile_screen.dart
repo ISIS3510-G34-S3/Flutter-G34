@@ -66,6 +66,16 @@ class ProfileScreen extends StatelessWidget {
           // My experiences section
           _buildExperiencesSection(user),
 
+          const SizedBox(height: 16),
+
+          // Achievements section
+          _buildAchievementsSection(),
+
+          const SizedBox(height: 16),
+
+          // Settings section
+          _buildSettingsSection(context),
+
           const SizedBox(height: 32),
         ],
       ),
@@ -393,6 +403,217 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
+  Widget _buildAchievementsSection() {
+    return Card(
+      elevation: 1,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(
+                  Icons.emoji_events,
+                  size: 20,
+                  color: AppColors.oliveGold,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  'Achievements',
+                  style: AppTypography.titleSmall.copyWith(
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            GridView.count(
+              crossAxisCount: 2,
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              crossAxisSpacing: 12,
+              mainAxisSpacing: 12,
+              childAspectRatio: 1.2,
+              children: [
+                _buildAchievementItem(
+                  icon: Icons.hotel,
+                  title: 'Super Host',
+                  color: AppColors.forestGreen,
+                ),
+                _buildAchievementItem(
+                  icon: Icons.star,
+                  title: '5 Star Host',
+                  color: AppColors.oliveGold,
+                ),
+                _buildAchievementItem(
+                  icon: Icons.flash_on,
+                  title: 'Fast Responder',
+                  color: AppColors.lava,
+                ),
+                _buildAchievementItem(
+                  icon: Icons.people,
+                  title: 'Skill Sharer',
+                  color: AppColors.peach,
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAchievementItem({
+    required IconData icon,
+    required String title,
+    required Color color,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: color.withValues(alpha: 0.3),
+        ),
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            icon,
+            size: 32,
+            color: color,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            title,
+            style: AppTypography.bodySmall.copyWith(
+              color: AppColors.textPrimary,
+              fontWeight: FontWeight.w600,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSettingsSection(BuildContext context) {
+    return Card(
+      elevation: 1,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(
+                  Icons.settings,
+                  size: 20,
+                  color: AppColors.forestGreen,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  'Settings',
+                  style: AppTypography.titleSmall.copyWith(
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            _buildSettingItem(
+              icon: Icons.notifications_outlined,
+              title: 'Notification Preferences',
+              onTap: () => _showComingSoonDialog(context, 'Notification Preferences'),
+            ),
+            _buildSettingItem(
+              icon: Icons.privacy_tip_outlined,
+              title: 'Privacy Settings',
+              onTap: () => _showComingSoonDialog(context, 'Privacy Settings'),
+            ),
+            _buildSettingItem(
+              icon: Icons.payment_outlined,
+              title: 'Payment Methods',
+              onTap: () => _showComingSoonDialog(context, 'Payment Methods'),
+            ),
+            _buildSettingItem(
+              icon: Icons.language_outlined,
+              title: 'Language & Region',
+              onTap: () => _showComingSoonDialog(context, 'Language & Region'),
+            ),
+            _buildSettingItem(
+              icon: Icons.help_outline,
+              title: 'Help & Support',
+              onTap: () => _showComingSoonDialog(context, 'Help & Support'),
+            ),
+            const SizedBox(height: 8),
+            Container(
+              height: 1,
+              color: AppColors.divider,
+              margin: const EdgeInsets.symmetric(vertical: 8),
+            ),
+            _buildSettingItem(
+              icon: Icons.logout,
+              title: 'Log Out',
+              onTap: () => _handleLogout(context),
+              iconColor: AppColors.lava,
+              textColor: AppColors.lava,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSettingItem({
+    required IconData icon,
+    required String title,
+    required VoidCallback onTap,
+    Color? iconColor,
+    Color? textColor,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
+        child: Row(
+          children: [
+            Icon(
+              icon,
+              size: 20,
+              color: iconColor ?? AppColors.textSecondary,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                title,
+                style: AppTypography.bodyMedium.copyWith(
+                  color: textColor ?? AppColors.textPrimary,
+                ),
+              ),
+            ),
+            Icon(
+              Icons.arrow_forward_ios,
+              size: 14,
+              color: AppColors.textSecondary,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   void _editProfile(BuildContext context) {
     showDialog(
       context: context,
@@ -416,6 +637,80 @@ class ProfileScreen extends StatelessWidget {
               'OK',
               style: AppTypography.buttonMedium.copyWith(
                 color: AppColors.forestGreen,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showComingSoonDialog(BuildContext context, String feature) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(
+          feature,
+          style: AppTypography.titleMedium.copyWith(
+            color: AppColors.textPrimary,
+          ),
+        ),
+        content: Text(
+          'This feature is coming soon! We\'re working hard to bring you the best experience.',
+          style: AppTypography.bodyMedium.copyWith(
+            color: AppColors.textPrimary,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text(
+              'OK',
+              style: AppTypography.buttonMedium.copyWith(
+                color: AppColors.forestGreen,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _handleLogout(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(
+          'Log Out',
+          style: AppTypography.titleMedium.copyWith(
+            color: AppColors.textPrimary,
+          ),
+        ),
+        content: Text(
+          'Are you sure you want to log out?',
+          style: AppTypography.bodyMedium.copyWith(
+            color: AppColors.textPrimary,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text(
+              'Cancel',
+              style: AppTypography.buttonMedium.copyWith(
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              context.go('/login');
+            },
+            child: Text(
+              'Log Out',
+              style: AppTypography.buttonMedium.copyWith(
+                color: AppColors.lava,
               ),
             ),
           ),
