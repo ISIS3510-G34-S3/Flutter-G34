@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import '../../theme/colors.dart';
 import '../../theme/typography.dart';
 import '../../mock/mock_data.dart';
@@ -421,7 +422,7 @@ class ExperienceDetailScreen extends StatelessWidget {
             // Message Host button
             Expanded(
               child: OutlinedButton.icon(
-                onPressed: () => _messageHost(context),
+                onPressed: () => _messageHost(context, experience.host.id),
                 icon: const Icon(Icons.message_outlined),
                 label: const Text('Message Host'),
                 style: OutlinedButton.styleFrom(
@@ -450,21 +451,8 @@ class ExperienceDetailScreen extends StatelessWidget {
     );
   }
 
-  void _messageHost(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          'Chat feature coming soon!',
-          style: AppTypography.bodyMedium.copyWith(color: AppColors.white),
-        ),
-        backgroundColor: AppColors.forestGreen,
-        action: SnackBarAction(
-          label: 'OK',
-          textColor: AppColors.white,
-          onPressed: () {},
-        ),
-      ),
-    );
+  void _messageHost(BuildContext context, String hostId) {
+    context.push('/messaging/$hostId');
   }
 
   void _bookExperience(BuildContext context) {
