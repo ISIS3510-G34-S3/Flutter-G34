@@ -93,8 +93,23 @@ class Review {
   });
 }
 
+class Message {
+  final String id;
+  final String text;
+  final String timestamp;
+  final bool isSentByUser;
+
+  const Message({
+    required this.id,
+    required this.text,
+    required this.timestamp,
+    required this.isSentByUser,
+  });
+}
+
 /// Mock data provider
 class MockData {
+  /// Mock hosts data
   static const List<Host> hosts = [
     Host(
       id: 'host_1',
@@ -274,6 +289,40 @@ class MockData {
     ),
   ];
 
+  /// Mock messages for messaging screen
+  static const List<Message> messages = [
+    Message(
+      id: 'msg_1',
+      text: 'Hi! Thanks for your interest in my cooking class. Do you have any dietary restrictions I should know about?',
+      timestamp: '10:30 AM',
+      isSentByUser: false,
+    ),
+    Message(
+      id: 'msg_2',
+      text: 'Hello! No dietary restrictions here. I\'m really excited to learn traditional Portuguese recipes!',
+      timestamp: '10:45 AM',
+      isSentByUser: true,
+    ),
+    Message(
+      id: 'msg_3',
+      text: 'Perfect! We\'ll be making pastéis de nata and bacalhau à brás. The class includes all ingredients and you\'ll take home recipes.',
+      timestamp: '11:00 AM',
+      isSentByUser: false,
+    ),
+    Message(
+      id: 'msg_4',
+      text: 'That sounds amazing! What should I bring?',
+      timestamp: '11:15 AM',
+      isSentByUser: true,
+    ),
+    Message(
+      id: 'msg_5',
+      text: 'Just bring an apron if you have one, and your appetite! Everything else is provided. See you tomorrow at 2 PM!',
+      timestamp: '11:20 AM',
+      isSentByUser: false,
+    ),
+  ];
+
   /// Filter experiences based on search query and filters
   static List<Experience> filterExperiences({
     String? searchQuery,
@@ -337,6 +386,13 @@ class MockData {
     return reviews
         .where((review) => review.experienceId == experienceId)
         .toList();
+  }
+
+  /// Get messages for host conversation
+  static List<Message> getMessagesForHost(String hostId) {
+    // For now, return the same messages for all hosts
+    // In a real app, this would be filtered by hostId
+    return List.from(messages);
   }
 
   /// Get current user (for profile screen)

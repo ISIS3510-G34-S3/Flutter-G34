@@ -7,6 +7,7 @@ import '../features/map/map_screen.dart';
 import '../features/create/create_experience_screen.dart';
 import '../features/profile/profile_screen.dart';
 import '../features/profile/profie_verification_screen.dart';
+import '../features/messaging/messaging_screen.dart';
 import '../widgets/main_scaffold.dart';
 
 /// Main router configuration for the app
@@ -72,6 +73,16 @@ final GoRouter appRouter = GoRouter(
       path: '/profile-verification',
       name: 'profile-verification',
       builder: (context, state) => const ProfileVerificationScreen(),
+    ),
+
+    // Messaging route (standalone)
+    GoRoute(
+      path: '/messaging/:hostId',
+      name: 'messaging',
+      builder: (context, state) {
+        final hostId = state.pathParameters['hostId']!;
+        return MessagingScreen(hostId: hostId);
+      },
     ),
   ],
   errorBuilder: (context, state) => Scaffold(
