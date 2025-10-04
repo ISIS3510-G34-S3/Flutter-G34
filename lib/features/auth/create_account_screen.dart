@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../theme/colors.dart';
 import '../../theme/typography.dart';
 
@@ -442,28 +444,60 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
     setState(() {
       _isLoading = true;
     });
+    try {
+      final name = _fullNameController.text.trim();
+      final email = _emailController.text.trim();
+      final password = _passwordController.text.trim();
 
-    // Simulate account creation delay
-    await Future.delayed(const Duration(milliseconds: 2000));
+      // Create user with Firebase Auth
+      final credential = await FirebaseAuth.instance
+          .createUserWithEmailAndPassword(email: email, password: password);
 
-    if (mounted) {
-      setState(() {
-        _isLoading = false;
-      });
+      final user = credential.user;
+      if (user != null) {
+        // Optionally update display name
+        await user.updateDisplayName(name);
 
-      // Show success message
+        // Create user doc in Firestore
+        await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+          'uid': user.uid,
+          'email': email,
+          'displayName': name,
+          'userType': _selectedUserType,
+          'createdAt': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Account created! Welcome, $name'),
+            backgroundColor: AppColors.forestGreen,
+          ),
+        );
+        context.go('/discover');
+      }
+    } on FirebaseAuthException catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
-            'Account created successfully! Welcome, ${_fullNameController.text.trim()}!',
-          ),
-          backgroundColor: AppColors.forestGreen,
-          duration: const Duration(seconds: 2),
+          content: Text(e.message ?? 'Failed to create account'),
+          backgroundColor: AppColors.lava,
         ),
       );
-
-      // Navigate to discover screen
-      context.go('/discover');
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Unexpected error creating account'),
+          backgroundColor: AppColors.lava,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 }
