@@ -15,6 +15,43 @@ class MapScreen extends StatefulWidget {
 
 class _MapScreenState extends State<MapScreen> {
   Experience? _selectedExperience;
+  GoogleMapController? _mapController;
+  final Set<Marker> _markers = {};
+  
+  // Default location (Bogotá, Colombia)
+  static const CameraPosition _initialPosition = CameraPosition(
+    target: LatLng(4.6097, -74.0817),
+    zoom: 11.0,
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    _createMarkersFromExperiences();
+  }
+
+  void _createMarkersFromExperiences() {
+    _markers.clear();
+    for (final experience in MockData.experiences) {
+      final double latitude = experience.location['latitude'] ?? 4.6097;
+      final double longitude = experience.location['longitude'] ?? -74.0817;
+      
+      _markers.add(
+        Marker(
+          markerId: MarkerId(experience.id),
+          position: LatLng(latitude, longitude),
+          infoWindow: InfoWindow(
+            title: experience.title,
+            snippet: '${experience.hostName} • ${experience.avgRating}⭐',
+          ),
+          icon: experience.avgRating >= 4.8 
+              ? BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen)
+              : BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueOrange),
+          onTap: () => _selectExperience(experience),
+        ),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -42,13 +79,26 @@ class _MapScreenState extends State<MapScreen> {
       ),
       body: Stack(
         children: [
-          // Map grid background
-          _buildMapGrid(),
+          // Google Map
+          GoogleMap(
+            onMapCreated: (GoogleMapController controller) {
+              _mapController = controller;
+            },
+            initialCameraPosition: _initialPosition,
+            markers: _markers,
+            mapType: MapType.normal,
+            myLocationEnabled: true,
+            myLocationButtonEnabled: false,
+            zoomControlsEnabled: false,
+            onTap: (_) {
+              // Dismiss bottom sheet when tapping on map
+              setState(() {
+                _selectedExperience = null;
+              });
+            },
+          ),
 
-          // Map pins
-          _buildMapPins(),
-
-          // Zoom controls
+          // Custom zoom controls
           _buildZoomControls(),
 
           // Bottom sheet for selected experience
@@ -59,62 +109,7 @@ class _MapScreenState extends State<MapScreen> {
     );
   }
 
-  Widget _buildMapGrid() {
-    return Container(
-      color: AppColors.background,
-      child: CustomPaint(
-        painter: GridPainter(),
-        size: Size.infinite,
-      ),
-    );
-  }
 
-  Widget _buildMapPins() {
-    return Stack(
-      children: MockData.experiences.map((experience) {
-        // Extract latitude and longitude from experience location
-        final double latitude = experience.location['latitude'] ?? 0.0;
-        final double longitude = experience.location['longitude'] ?? 0.0;
-        
-        // Determine pin type based on rating (primary for 4.8+ rating)
-        final bool isPrimaryPin = experience.avgRating >= 4.8;
-
-        return Positioned(
-          left: (longitude + 80) * 4, // Mock positioning
-          top: (latitude - 3) * 100 + 200, // Mock positioning
-          child: GestureDetector(
-            onTap: () => _selectExperience(experience),
-            child: Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: isPrimaryPin
-                    ? AppColors.forestGreen
-                    : AppColors.earthBrown,
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: AppColors.white,
-                  width: 3,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppColors.textPrimary.withValues(alpha: 0.3),
-                    offset: const Offset(0, 2),
-                    blurRadius: 6,
-                  ),
-                ],
-              ),
-              child: const Icon(
-                Icons.location_on,
-                color: AppColors.white,
-                size: 20,
-              ),
-            ),
-          ),
-        );
-      }).toList(),
-    );
-  }
 
   Widget _buildZoomControls() {
     return Positioned(
@@ -373,24 +368,16 @@ class _MapScreenState extends State<MapScreen> {
     });
   }
 
-  void _zoomIn() {
-    // Mock zoom functionality
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Zooming in...'),
-        duration: Duration(milliseconds: 500),
-      ),
-    );
+  void _zoomIn() async {
+    if (_mapController != null) {
+      await _mapController!.animateCamera(CameraUpdate.zoomIn());
+    }
   }
 
-  void _zoomOut() {
-    // Mock zoom functionality
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Zooming out...'),
-        duration: Duration(milliseconds: 500),
-      ),
-    );
+  void _zoomOut() async {
+    if (_mapController != null) {
+      await _mapController!.animateCamera(CameraUpdate.zoomOut());
+    }
   }
 
   void _viewExperienceDetails(String experienceId) {
@@ -398,35 +385,4 @@ class _MapScreenState extends State<MapScreen> {
   }
 }
 
-/// Custom painter for drawing the map grid
-class GridPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = AppColors.divider.withValues(alpha: 0.3)
-      ..strokeWidth = 1;
 
-    const gridSize = 40.0;
-
-    // Draw vertical lines
-    for (double x = 0; x < size.width; x += gridSize) {
-      canvas.drawLine(
-        Offset(x, 0),
-        Offset(x, size.height),
-        paint,
-      );
-    }
-
-    // Draw horizontal lines
-    for (double y = 0; y < size.height; y += gridSize) {
-      canvas.drawLine(
-        Offset(0, y),
-        Offset(size.width, y),
-        paint,
-      );
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
