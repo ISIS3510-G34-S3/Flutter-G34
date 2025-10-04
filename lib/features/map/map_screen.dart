@@ -70,20 +70,24 @@ class _MapScreenState extends State<MapScreen> {
 
   Widget _buildMapPins() {
     return Stack(
-      children: MockData.mapPins.map((pin) {
-        final experience = MockData.getExperienceById(pin.experienceId);
-        if (experience == null) return const SizedBox.shrink();
+      children: MockData.experiences.map((experience) {
+        // Extract latitude and longitude from experience location
+        final double latitude = experience.location['latitude'] ?? 0.0;
+        final double longitude = experience.location['longitude'] ?? 0.0;
+        
+        // Determine pin type based on rating (primary for 4.8+ rating)
+        final bool isPrimaryPin = experience.avgRating >= 4.8;
 
         return Positioned(
-          left: (pin.longitude + 80) * 4, // Mock positioning
-          top: (pin.latitude - 3) * 100 + 200, // Mock positioning
+          left: (longitude + 80) * 4, // Mock positioning
+          top: (latitude - 3) * 100 + 200, // Mock positioning
           child: GestureDetector(
             onTap: () => _selectExperience(experience),
             child: Container(
               width: 40,
               height: 40,
               decoration: BoxDecoration(
-                color: pin.type == 'primary'
+                color: isPrimaryPin
                     ? AppColors.forestGreen
                     : AppColors.earthBrown,
                 shape: BoxShape.circle,
