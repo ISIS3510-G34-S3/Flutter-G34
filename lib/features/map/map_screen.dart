@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import '../../theme/colors.dart';
 import '../../theme/typography.dart';
 import '../../mock/mock_data.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 /// Map screen showing experience locations with pins
 class MapScreen extends StatefulWidget {
