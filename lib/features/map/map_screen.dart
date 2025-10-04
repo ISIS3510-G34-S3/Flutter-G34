@@ -4,6 +4,7 @@ import '../../theme/colors.dart';
 import '../../theme/typography.dart';
 import '../../mock/mock_data.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:location/location.dart';
 
 /// Map screen showing experience locations with pins
 class MapScreen extends StatefulWidget {
@@ -18,16 +19,21 @@ class _MapScreenState extends State<MapScreen> {
   GoogleMapController? _mapController;
   final Set<Marker> _markers = {};
   
-  // Default location (Bogotá, Colombia)
-  static const CameraPosition _initialPosition = CameraPosition(
+  // Location services
+  final Location _location = Location();
+  LocationData? _currentLocation;
+  
+  // Default location (Bogotá, Colombia) - fallback if location not available
+  final CameraPosition _initialPosition = const CameraPosition(
     target: LatLng(4.6097, -74.0817),
-    zoom: 11.0,
+    zoom: 3.0,
   );
-
+  
   @override
   void initState() {
     super.initState();
     _createMarkersFromExperiences();
+    _initializeLocation();
   }
 
   void _createMarkersFromExperiences() {
@@ -50,6 +56,69 @@ class _MapScreenState extends State<MapScreen> {
           onTap: () => _selectExperience(experience),
         ),
       );
+    }
+  }
+
+  /// Initialize location services and get current location
+  Future<void> _initializeLocation() async {
+    try {
+      // Check if location service is enabled
+      bool serviceEnabled = await _location.serviceEnabled();
+      if (!serviceEnabled) {
+        serviceEnabled = await _location.requestService();
+        if (!serviceEnabled) {
+          return;
+        }
+      }
+
+      // Check location permissions
+      PermissionStatus permissionGranted = await _location.hasPermission();
+      if (permissionGranted == PermissionStatus.denied) {
+        permissionGranted = await _location.requestPermission();
+        if (permissionGranted != PermissionStatus.granted) {
+          return;
+        }
+      }
+
+      // Get current location
+      await _getCurrentLocation();
+    } catch (e) {
+      debugPrint('Error initializing location: $e');
+    }
+  }
+
+  /// Get the user's current location
+  Future<void> _getCurrentLocation() async {
+    try {
+      final LocationData locationData = await _location.getLocation();
+      setState(() {
+        _currentLocation = locationData;
+      });
+
+      // Move map to user's location if map controller is available
+      if (_mapController != null && _currentLocation != null) {
+        await _mapController!.animateCamera(
+          CameraUpdate.newCameraPosition(
+            CameraPosition(
+              target: LatLng(
+                _currentLocation!.latitude!,
+                _currentLocation!.longitude!,
+              ),
+              zoom: 15.0,
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('Error getting current location: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Unable to get your location. Please enable location services.'),
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
     }
   }
 
@@ -83,13 +152,16 @@ class _MapScreenState extends State<MapScreen> {
           GoogleMap(
             onMapCreated: (GoogleMapController controller) {
               _mapController = controller;
+              // Get location again after map is ready
+              _getCurrentLocation();
             },
             initialCameraPosition: _initialPosition,
             markers: _markers,
             mapType: MapType.normal,
-            myLocationEnabled: true,
-            myLocationButtonEnabled: false,
+            myLocationEnabled: true, // Shows the blue dot for user location
+            myLocationButtonEnabled: false, // We have our custom button
             zoomControlsEnabled: false,
+            compassEnabled: true,
             onTap: (_) {
               // Dismiss bottom sheet when tapping on map
               setState(() {
@@ -162,6 +234,31 @@ class _MapScreenState extends State<MapScreen> {
                 color: AppColors.textPrimary,
               ),
               tooltip: 'Zoom out',
+            ),
+          ),
+
+          const SizedBox(height: 8),
+
+          // My Location button
+          Container(
+            decoration: BoxDecoration(
+              color: AppColors.white,
+              borderRadius: BorderRadius.circular(8),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.textPrimary.withValues(alpha: 0.2),
+                  offset: const Offset(0, 2),
+                  blurRadius: 8,
+                ),
+              ],
+            ),
+            child: IconButton(
+              onPressed: _moveToUserLocation,
+              icon: const Icon(
+                Icons.my_location,
+                color: AppColors.forestGreen,
+              ),
+              tooltip: 'My Location',
             ),
           ),
         ],
@@ -377,6 +474,40 @@ class _MapScreenState extends State<MapScreen> {
   void _zoomOut() async {
     if (_mapController != null) {
       await _mapController!.animateCamera(CameraUpdate.zoomOut());
+    }
+  }
+
+  void _moveToUserLocation() async {
+    if (_mapController != null) {
+      try {
+        // If we have current location, use it
+        if (_currentLocation != null) {
+          await _mapController!.animateCamera(
+            CameraUpdate.newCameraPosition(
+              CameraPosition(
+                target: LatLng(
+                  _currentLocation!.latitude!,
+                  _currentLocation!.longitude!,
+                ),
+                zoom: 15.0,
+              ),
+            ),
+          );
+        } else {
+          // Try to get fresh location
+          await _getCurrentLocation();
+        }
+      } catch (e) {
+        // Handle location error
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Unable to get your location. Please enable location services.'),
+              duration: Duration(seconds: 3),
+            ),
+          );
+        }
+      }
     }
   }
 
