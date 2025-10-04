@@ -127,7 +127,7 @@ class ExperienceCard extends StatelessWidget {
               ),
               const SizedBox(width: 4),
               Text(
-                experience.rating.toString(),
+                experience.avgRating.toString(),
                 style: AppTypography.labelSmall.copyWith(
                   color: AppColors.white,
                   fontWeight: FontWeight.w600,
@@ -143,18 +143,35 @@ class ExperienceCard extends StatelessWidget {
   Widget _buildHostSection() {
     return Row(
       children: [
+        // Avatar placeholder
+        Container(
+          width: 32,
+          height: 32,
+          decoration: BoxDecoration(
+            color: AppColors.peach.withValues(alpha: 0.3),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(
+            Icons.person_outline,
+            size: 18,
+            color: AppColors.oliveGold.withValues(alpha: 0.7),
+          ),
+        ),
+
+        const SizedBox(width: 8),
+
         // Host name with verified check
         Expanded(
           child: Row(
             children: [
               Text(
-                experience.host.name,
+                experience.hostName,
                 style: AppTypography.bodyMedium.copyWith(
                   color: AppColors.textSecondary,
                   fontWeight: FontWeight.w500,
                 ),
               ),
-              if (experience.host.isVerified) ...[
+              if (experience.isHostVerified) ...[
                 const SizedBox(width: 4),
                 const Icon(
                   Icons.verified,
@@ -178,7 +195,7 @@ class ExperienceCard extends StatelessWidget {
             ),
             const SizedBox(width: 4),
             Text(
-              experience.location,
+              experience.department,
               style: AppTypography.bodySmall.copyWith(
                 color: AppColors.textSecondary,
               ),
@@ -253,7 +270,7 @@ class ExperienceCard extends StatelessWidget {
       children: [
         // Review count
         Text(
-          '(${experience.reviewCount} reviews)',
+          '(${experience.reviewsCount} reviews)',
           style: AppTypography.bodySmall.copyWith(
             color: AppColors.textSecondary,
           ),
@@ -261,7 +278,7 @@ class ExperienceCard extends StatelessWidget {
 
         // Time ago
         Text(
-          experience.timeAgo,
+          '${DateTime.now().difference(experience.createdAt).inDays} days ago',
           style: AppTypography.bodySmall.copyWith(
             color: AppColors.textSecondary,
           ),

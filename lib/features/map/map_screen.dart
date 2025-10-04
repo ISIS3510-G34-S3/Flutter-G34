@@ -3,6 +3,8 @@ import 'package:go_router/go_router.dart';
 import '../../theme/colors.dart';
 import '../../theme/typography.dart';
 import '../../mock/mock_data.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:location/location.dart';
 
 /// Map screen showing experience locations with pins
 class MapScreen extends StatefulWidget {
@@ -14,6 +16,111 @@ class MapScreen extends StatefulWidget {
 
 class _MapScreenState extends State<MapScreen> {
   Experience? _selectedExperience;
+  GoogleMapController? _mapController;
+  final Set<Marker> _markers = {};
+  
+  // Location services
+  final Location _location = Location();
+  LocationData? _currentLocation;
+  
+  // Default location (Bogotá, Colombia) - fallback if location not available
+  final CameraPosition _initialPosition = const CameraPosition(
+    target: LatLng(4.6097, -74.0817),
+    zoom: 3.0,
+  );
+  
+  @override
+  void initState() {
+    super.initState();
+    _createMarkersFromExperiences();
+    _initializeLocation();
+  }
+
+  void _createMarkersFromExperiences() {
+    _markers.clear();
+    for (final experience in MockData.experiences) {
+      final double latitude = experience.location['latitude'] ?? 4.6097;
+      final double longitude = experience.location['longitude'] ?? -74.0817;
+      
+      _markers.add(
+        Marker(
+          markerId: MarkerId(experience.id),
+          position: LatLng(latitude, longitude),
+          infoWindow: InfoWindow(
+            title: experience.title,
+            snippet: '${experience.hostName} • ${experience.avgRating}⭐',
+          ),
+          icon: experience.avgRating >= 4.8 
+              ? BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen)
+              : BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueOrange),
+          onTap: () => _selectExperience(experience),
+        ),
+      );
+    }
+  }
+
+  /// Initialize location services and get current location
+  Future<void> _initializeLocation() async {
+    try {
+      // Check if location service is enabled
+      bool serviceEnabled = await _location.serviceEnabled();
+      if (!serviceEnabled) {
+        serviceEnabled = await _location.requestService();
+        if (!serviceEnabled) {
+          return;
+        }
+      }
+
+      // Check location permissions
+      PermissionStatus permissionGranted = await _location.hasPermission();
+      if (permissionGranted == PermissionStatus.denied) {
+        permissionGranted = await _location.requestPermission();
+        if (permissionGranted != PermissionStatus.granted) {
+          return;
+        }
+      }
+
+      // Get current location
+      await _getCurrentLocation();
+    } catch (e) {
+      debugPrint('Error initializing location: $e');
+    }
+  }
+
+  /// Get the user's current location
+  Future<void> _getCurrentLocation() async {
+    try {
+      final LocationData locationData = await _location.getLocation();
+      setState(() {
+        _currentLocation = locationData;
+      });
+
+      // Move map to user's location if map controller is available
+      if (_mapController != null && _currentLocation != null) {
+        await _mapController!.animateCamera(
+          CameraUpdate.newCameraPosition(
+            CameraPosition(
+              target: LatLng(
+                _currentLocation!.latitude!,
+                _currentLocation!.longitude!,
+              ),
+              zoom: 15.0,
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('Error getting current location: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Unable to get your location. Please enable location services.'),
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -41,13 +148,29 @@ class _MapScreenState extends State<MapScreen> {
       ),
       body: Stack(
         children: [
-          // Map grid background
-          _buildMapGrid(),
+          // Google Map
+          GoogleMap(
+            onMapCreated: (GoogleMapController controller) {
+              _mapController = controller;
+              // Get location again after map is ready
+              _getCurrentLocation();
+            },
+            initialCameraPosition: _initialPosition,
+            markers: _markers,
+            mapType: MapType.normal,
+            myLocationEnabled: true, // Shows the blue dot for user location
+            myLocationButtonEnabled: false, // We have our custom button
+            zoomControlsEnabled: false,
+            compassEnabled: true,
+            onTap: (_) {
+              // Dismiss bottom sheet when tapping on map
+              setState(() {
+                _selectedExperience = null;
+              });
+            },
+          ),
 
-          // Map pins
-          _buildMapPins(),
-
-          // Zoom controls
+          // Custom zoom controls
           _buildZoomControls(),
 
           // Bottom sheet for selected experience
@@ -58,58 +181,7 @@ class _MapScreenState extends State<MapScreen> {
     );
   }
 
-  Widget _buildMapGrid() {
-    return Container(
-      color: AppColors.background,
-      child: CustomPaint(
-        painter: GridPainter(),
-        size: Size.infinite,
-      ),
-    );
-  }
 
-  Widget _buildMapPins() {
-    return Stack(
-      children: MockData.mapPins.map((pin) {
-        final experience = MockData.getExperienceById(pin.experienceId);
-        if (experience == null) return const SizedBox.shrink();
-
-        return Positioned(
-          left: (pin.longitude + 80) * 4, // Mock positioning
-          top: (pin.latitude - 3) * 100 + 200, // Mock positioning
-          child: GestureDetector(
-            onTap: () => _selectExperience(experience),
-            child: Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: pin.type == 'primary'
-                    ? AppColors.forestGreen
-                    : AppColors.earthBrown,
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: AppColors.white,
-                  width: 3,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppColors.textPrimary.withValues(alpha: 0.3),
-                    offset: const Offset(0, 2),
-                    blurRadius: 6,
-                  ),
-                ],
-              ),
-              child: const Icon(
-                Icons.location_on,
-                color: AppColors.white,
-                size: 20,
-              ),
-            ),
-          ),
-        );
-      }).toList(),
-    );
-  }
 
   Widget _buildZoomControls() {
     return Positioned(
@@ -162,6 +234,31 @@ class _MapScreenState extends State<MapScreen> {
                 color: AppColors.textPrimary,
               ),
               tooltip: 'Zoom out',
+            ),
+          ),
+
+          const SizedBox(height: 8),
+
+          // My Location button
+          Container(
+            decoration: BoxDecoration(
+              color: AppColors.white,
+              borderRadius: BorderRadius.circular(8),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.textPrimary.withValues(alpha: 0.2),
+                  offset: const Offset(0, 2),
+                  blurRadius: 8,
+                ),
+              ],
+            ),
+            child: IconButton(
+              onPressed: _moveToUserLocation,
+              icon: const Icon(
+                Icons.my_location,
+                color: AppColors.forestGreen,
+              ),
+              tooltip: 'My Location',
             ),
           ),
         ],
@@ -239,7 +336,7 @@ class _MapScreenState extends State<MapScreen> {
                             ),
                             const SizedBox(width: 4),
                             Text(
-                              experience.rating.toString(),
+                              experience.avgRating.toString(),
                               style: AppTypography.labelSmall.copyWith(
                                 color: AppColors.white,
                                 fontWeight: FontWeight.w600,
@@ -257,13 +354,13 @@ class _MapScreenState extends State<MapScreen> {
                   Row(
                     children: [
                       Text(
-                        experience.host.name,
+                        experience.hostName,
                         style: AppTypography.bodyMedium.copyWith(
                           color: AppColors.textSecondary,
                           fontWeight: FontWeight.w500,
                         ),
                       ),
-                      if (experience.host.isVerified) ...[
+                      if (experience.isHostVerified) ...[
                         const SizedBox(width: 4),
                         const Icon(
                           Icons.verified,
@@ -279,7 +376,7 @@ class _MapScreenState extends State<MapScreen> {
                       ),
                       const SizedBox(width: 4),
                       Text(
-                        experience.location,
+                        experience.department,
                         style: AppTypography.bodySmall.copyWith(
                           color: AppColors.textSecondary,
                         ),
@@ -368,24 +465,50 @@ class _MapScreenState extends State<MapScreen> {
     });
   }
 
-  void _zoomIn() {
-    // Mock zoom functionality
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Zooming in...'),
-        duration: Duration(milliseconds: 500),
-      ),
-    );
+  void _zoomIn() async {
+    if (_mapController != null) {
+      await _mapController!.animateCamera(CameraUpdate.zoomIn());
+    }
   }
 
-  void _zoomOut() {
-    // Mock zoom functionality
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Zooming out...'),
-        duration: Duration(milliseconds: 500),
-      ),
-    );
+  void _zoomOut() async {
+    if (_mapController != null) {
+      await _mapController!.animateCamera(CameraUpdate.zoomOut());
+    }
+  }
+
+  void _moveToUserLocation() async {
+    if (_mapController != null) {
+      try {
+        // If we have current location, use it
+        if (_currentLocation != null) {
+          await _mapController!.animateCamera(
+            CameraUpdate.newCameraPosition(
+              CameraPosition(
+                target: LatLng(
+                  _currentLocation!.latitude!,
+                  _currentLocation!.longitude!,
+                ),
+                zoom: 15.0,
+              ),
+            ),
+          );
+        } else {
+          // Try to get fresh location
+          await _getCurrentLocation();
+        }
+      } catch (e) {
+        // Handle location error
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Unable to get your location. Please enable location services.'),
+              duration: Duration(seconds: 3),
+            ),
+          );
+        }
+      }
+    }
   }
 
   void _viewExperienceDetails(String experienceId) {
@@ -393,35 +516,4 @@ class _MapScreenState extends State<MapScreen> {
   }
 }
 
-/// Custom painter for drawing the map grid
-class GridPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = AppColors.divider.withValues(alpha: 0.3)
-      ..strokeWidth = 1;
 
-    const gridSize = 40.0;
-
-    // Draw vertical lines
-    for (double x = 0; x < size.width; x += gridSize) {
-      canvas.drawLine(
-        Offset(x, 0),
-        Offset(x, size.height),
-        paint,
-      );
-    }
-
-    // Draw horizontal lines
-    for (double y = 0; y < size.height; y += gridSize) {
-      canvas.drawLine(
-        Offset(0, y),
-        Offset(size.width, y),
-        paint,
-      );
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}

@@ -73,19 +73,19 @@ class _BookingScreenState extends State<BookingScreen> {
                         ),
                       ),
                       Text(
-                        experience.host.name,
+                        experience.hostName,
                         style: AppTypography.bodySmall.copyWith(
                           color: AppColors.textSecondary,
                         ),
                       ),
                       Text(
-                        experience.location,
+                        experience.department ,
                         style: AppTypography.bodySmall.copyWith(
                           color: AppColors.textSecondary,
                         ),
                       ),
                       Text(
-                        '${experience.duration} • ${experience.category}',
+                        '${experience.duration} days • ${experience.categories.isNotEmpty ? experience.categories.first : 'Experience'}',
                         style: AppTypography.bodySmall.copyWith(
                           color: AppColors.textSecondary,
                         ),
