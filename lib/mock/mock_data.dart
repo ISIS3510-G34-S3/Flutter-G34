@@ -4,7 +4,7 @@ class Host {
   final String name;
   final String email;
   final bool isVerified;
-  final String memberSince;
+  final DateTime memberSince;
   final List<String> languages;
   final String responseRate;
   final String about;
@@ -28,35 +28,74 @@ class Host {
 class Experience {
   final String id;
   final String title;
-  final String description;
-  final Host host;
-  final String location;
-  final double rating;
-  final int reviewCount;
-  final String duration;
+  final String summary;
+  final String hostId;
+  final bool hostVerified;
+  final Map<String, double> location;
+  final String department;
+  final double avgRating;
+  final int reviewsCount;
+  final int duration;
   final List<String> skillsToLearn;
   final List<String> skillsToTeach;
-  final String category;
-  final String timeAgo;
-  final double latitude;
-  final double longitude;
+  final List<String> categories;
+  final DateTime createdAt;
+  final int priceCOP;
+  final int groupSizeMax;
+  final List<String> paymentOptions;
+  final bool isActive;
 
   const Experience({
     required this.id,
     required this.title,
-    required this.description,
-    required this.host,
+    required this.summary,
+    required this.hostId,
+    required this.hostVerified,
     required this.location,
-    required this.rating,
-    required this.reviewCount,
+    required this.department,
+    required this.avgRating,
+    required this.reviewsCount,
     required this.duration,
     required this.skillsToLearn,
     required this.skillsToTeach,
-    required this.category,
-    required this.timeAgo,
-    required this.latitude,
-    required this.longitude,
+    required this.categories,
+    required this.createdAt,
+    required this.priceCOP,
+    required this.groupSizeMax,
+    required this.paymentOptions,
+    required this.isActive,
   });
+
+  // Helper to get host object
+  Host? get host {
+    return MockData.getHostById(hostId);
+  }
+
+  // Safe helper methods for host data with fallbacks
+  String get hostName {
+    final hostData = MockData.getHostById(hostId);
+    return hostData?.name ?? 'Unknown Host';
+  }
+
+  bool get isHostVerified {
+    final hostData = MockData.getHostById(hostId);
+    return hostData?.isVerified ?? false;
+  }
+
+  List<String> get hostLanguages {
+    final hostData = MockData.getHostById(hostId);
+    return hostData?.languages ?? ['Unknown'];
+  }
+
+  String get hostResponseRate {
+    final hostData = MockData.getHostById(hostId);
+    return hostData?.responseRate ?? '0%';
+  }
+
+  DateTime get hostMemberSince {
+    final hostData = MockData.getHostById(hostId);
+    return hostData?.memberSince ?? DateTime(2020);
+  }
 }
 
 class MapPin {
@@ -110,14 +149,14 @@ class Message {
 /// Mock data provider
 class MockData {
   /// Mock hosts data
-  static const List<Host> hosts = [
+  static final List<Host> hosts = [
     Host(
       id: 'host_1',
       name: 'Carlos Mendoza',
       email: 'carlos.mendoza@email.com',
       isVerified: true,
-      memberSince: '2019',
-      languages: ['Spanish (Native)', 'English (Fluent)', 'Portuguese (Basic)'],
+      memberSince: DateTime(2019),
+      languages: ['es', 'en'],
       responseRate: '98%',
       about:
           'Passionate coffee farmer and photography enthusiast from the Colombian mountains. I love sharing traditional farming methods and teaching sustainable coffee harvesting techniques.',
@@ -129,8 +168,8 @@ class MockData {
       name: 'María Gutierrez',
       email: 'maria.gutierrez@email.com',
       isVerified: true,
-      memberSince: '2020',
-      languages: ['Spanish (Native)', 'English (Intermediate)'],
+      memberSince: DateTime(2020),
+      languages: ['es'],
       responseRate: '95%',
       about:
           'Local fishing guide and English teacher from Honda, Colombia. I enjoy sharing our river culture and helping visitors practice their Spanish conversation skills.',
@@ -142,13 +181,8 @@ class MockData {
       name: 'Ana Sofia Rodriguez',
       email: 'ana.sofia@email.com',
       isVerified: false,
-      memberSince: '2024',
-      languages: [
-        'Spanish (Native)',
-        'English (Fluent)',
-        'Portuguese (Basic)',
-        'French (Learning)'
-      ],
+      memberSince: DateTime(2024),
+      languages: ['es', 'en', 'pt', 'fr'],
       responseRate: '100%',
       about:
           'Passionate about Colombian culture and digital design. Love connecting with travelers and sharing our beautiful traditions. I have been hosting experiences for over 3 years and enjoy meeting people from around the world.',
@@ -161,70 +195,108 @@ class MockData {
     Experience(
       id: 'exp_1',
       title: 'Learn Coffee Harvesting & Teach Photography',
-      description:
+      summary:
           'Experience traditional coffee harvesting in the mountains while sharing your photography skills with local farmers',
-      host: hosts[0],
-      location: 'Tolima, Colombia',
-      rating: 4.9,
-      reviewCount: 18,
-      duration: '3 hours',
+      hostId: 'host_1',
+      hostVerified: true,
+      department: 'Tolima',
+      location: {"latitude": 4.4389, "longitude": -75.2322},
+      avgRating: 4.9,
+      reviewsCount: 18,
+      duration: 3,
       skillsToLearn: ['Coffee Harvesting', 'Traditional Farming Methods'],
       skillsToTeach: ['Photography Techniques', 'Digital Editing'],
-      category: 'Agriculture',
-      timeAgo: '2 days',
-      latitude: 4.4389,
-      longitude: -75.2322,
+      categories: ['Agriculture', 'Outdoor'],
+      createdAt: DateTime.now().subtract(const Duration(days: 2)),
+      priceCOP: 150000,
+      groupSizeMax: 6,
+      paymentOptions: ['cash', 'card'],
+      isActive: true,
     ),
     Experience(
       id: 'exp_2',
       title: 'Fishing on Magdalena River & Practice English',
-      description:
+      summary:
           'Join local fishermen on the Magdalena River while practicing English conversation and learning traditional fishing methods',
-      host: hosts[1],
-      location: 'Honda, Colombia',
-      rating: 4.7,
-      reviewCount: 12,
-      duration: '4 hours',
+      hostId: 'host_2',
+      hostVerified: true,
+      department: 'Tolima',
+      location: {"latitude": 5.2084, "longitude": -74.7372},
+      avgRating: 4.7,
+      reviewsCount: 12,
+      duration: 4,
       skillsToLearn: ['Traditional Fishing', 'River Navigation'],
       skillsToTeach: ['English Conversation', 'Cultural Exchange'],
-      category: 'Outdoor',
-      timeAgo: '1 week',
-      latitude: 5.2084,
-      longitude: -74.7372,
+      categories: ['Outdoor', 'Culture'],
+      createdAt: DateTime.now().subtract(const Duration(days: 7)),
+      priceCOP: 100000,
+      groupSizeMax: 4,
+      paymentOptions: ['cash'],
+      isActive: true,
     ),
     Experience(
       id: 'exp_3',
       title: 'Colombian Cooking & Digital Design Workshop',
-      description:
+      summary:
           'Learn to cook traditional Colombian dishes while teaching modern digital design techniques',
-      host: hosts[2],
-      location: 'Bogotá, Colombia',
-      rating: 4.8,
-      reviewCount: 24,
-      duration: '5 hours',
+      hostId: 'host_3',
+      hostVerified: false,
+      department: 'Bogotá D.C.',
+      location: {"latitude": 4.7110, "longitude": -74.0721},
+      avgRating: 4.8,
+      reviewsCount: 24,
+      duration: 5,
       skillsToLearn: ['Colombian Cuisine', 'Traditional Recipes'],
       skillsToTeach: ['UI/UX Design', 'Adobe Creative Suite'],
-      category: 'Culinary',
-      timeAgo: '3 days',
-      latitude: 4.7110,
-      longitude: -74.0721,
+      categories: ['Culinary', 'Technology'],
+      createdAt: DateTime.now().subtract(const Duration(days: 3)),
+      priceCOP: 200000,
+      groupSizeMax: 10,
+      paymentOptions: ['card'],
+      isActive: true,
     ),
     Experience(
       id: 'exp_4',
       title: 'Salsa Dancing & Language Exchange',
-      description:
+      summary:
           'Learn authentic Colombian salsa moves while practicing Spanish conversation with local dancers',
-      host: hosts[2],
-      location: 'Cali, Colombia',
-      rating: 4.6,
-      reviewCount: 31,
-      duration: '2 hours',
+      hostId: 'host_3',
+      hostVerified: false,
+      department: 'Valle del Cauca',
+      location: {"latitude": 3.4516, "longitude": -76.5320},
+      avgRating: 4.6,
+      reviewsCount: 31,
+      duration: 2,
       skillsToLearn: ['Salsa Dancing', 'Colombian Rhythms'],
       skillsToTeach: ['Foreign Languages', 'Cultural Exchange'],
-      category: 'Arts',
-      timeAgo: '5 days',
-      latitude: 3.4516,
-      longitude: -76.5320,
+      categories: ['Arts', 'Culture'],
+      createdAt: DateTime.now().subtract(const Duration(days: 5)),
+      priceCOP: 80000,
+      groupSizeMax: 12,
+      paymentOptions: ['cash', 'card'],
+      isActive: true,
+    ),
+    // Example experience with non-existent host (to test robustness)
+    Experience(
+      id: 'exp_5',
+      title: 'Mountain Hiking & Survival Skills',
+      summary:
+          'Join an adventurous mountain hiking experience while learning essential survival skills',
+      hostId: 'host_nonexistent', // This host doesn't exist in the hosts collection
+      hostVerified: false,
+      department: 'Santander',
+      location: {"latitude": 7.1193, "longitude": -73.1227},
+      avgRating: 4.5,
+      reviewsCount: 8,
+      duration: 2,
+      skillsToLearn: ['Survival Skills', 'Mountain Navigation'],
+      skillsToTeach: ['First Aid', 'Emergency Response'],
+      categories: ['Adventure', 'Outdoor'],
+      createdAt: DateTime.now().subtract(const Duration(days: 1)),
+      priceCOP: 180000,
+      groupSizeMax: 6,
+      paymentOptions: ['cash'],
+      isActive: true,
     ),
   ];
 
@@ -256,6 +328,13 @@ class MockData {
       latitude: 3.4516,
       longitude: -76.5320,
       type: 'secondary',
+    ),
+    MapPin(
+      id: 'pin_5',
+      experienceId: 'exp_5',
+      latitude: 7.1193,
+      longitude: -73.1227,
+      type: 'primary',
     ),
   ];
 
@@ -338,27 +417,27 @@ class MockData {
       filtered = filtered
           .where((exp) =>
               exp.title.toLowerCase().contains(searchQuery.toLowerCase()) ||
-              exp.description
+              exp.summary
                   .toLowerCase()
                   .contains(searchQuery.toLowerCase()) ||
-              exp.location.toLowerCase().contains(searchQuery.toLowerCase()))
+              exp.department.toLowerCase().contains(searchQuery.toLowerCase()))
           .toList();
     }
 
     if (categories != null && categories.isNotEmpty) {
       filtered =
-          filtered.where((exp) => categories.contains(exp.category)).toList();
+          filtered.where((exp) => exp.categories.any(categories.contains)).toList();
     }
 
     if (regions != null && regions.isNotEmpty) {
       filtered = filtered
           .where(
-              (exp) => regions.any((region) => exp.location.contains(region)))
+              (exp) => regions.any((region) => exp.department.contains(region)))
           .toList();
     }
 
     // Sort by rating by default
-    filtered.sort((a, b) => b.rating.compareTo(a.rating));
+    filtered.sort((a, b) => b.avgRating.compareTo(a.avgRating));
 
     return filtered;
   }
@@ -377,8 +456,16 @@ class MockData {
     try {
       return hosts.firstWhere((host) => host.id == id);
     } catch (e) {
+      // Host not found in collection
+      // In a real app, this would log the error for debugging
+      // print('Host with id $id not found in hosts collection');
       return null;
     }
+  }
+
+  /// Check if host exists in the collection
+  static bool hostExists(String hostId) {
+    return hosts.any((host) => host.id == hostId);
   }
 
   /// Get reviews for experience
@@ -411,13 +498,10 @@ class MockData {
 
   /// Available regions for filtering
   static const List<String> regions = [
-    'Bogotá',
-    'Medellín',
-    'Cali',
-    'Cartagena',
-    'Tolima',
-    'Honda',
+    'Bogotá D.C.',
+    'Valle del Cauca',
     'Antioquia',
+    'Tolima',
   ];
 
   /// Available languages for filtering

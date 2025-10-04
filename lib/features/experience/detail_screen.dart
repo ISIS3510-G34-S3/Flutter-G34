@@ -144,7 +144,7 @@ class ExperienceDetailScreen extends StatelessWidget {
                     ),
                     const SizedBox(width: 4),
                     Text(
-                      '${experience.rating} (${experience.reviewCount} reviews)',
+                      '${experience.avgRating} (${experience.reviewsCount} reviews)',
                       style: AppTypography.labelMedium.copyWith(
                         color: AppColors.white,
                         fontWeight: FontWeight.w600,
@@ -166,7 +166,7 @@ class ExperienceDetailScreen extends StatelessWidget {
                   ),
                   const SizedBox(width: 4),
                   Text(
-                    experience.location,
+                    experience.department,
                     style: AppTypography.bodyMedium.copyWith(
                       color: AppColors.textSecondary,
                     ),
@@ -181,6 +181,9 @@ class ExperienceDetailScreen extends StatelessWidget {
   }
 
   Widget _buildHostSection(Experience experience) {
+    final host = experience.host;
+    if (host == null) return const SizedBox.shrink();
+
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
       padding: const EdgeInsets.all(16),
@@ -216,12 +219,12 @@ class ExperienceDetailScreen extends StatelessWidget {
                 Row(
                   children: [
                     Text(
-                      experience.host.name,
+                      host.name,
                       style: AppTypography.titleSmall.copyWith(
                         color: AppColors.textPrimary,
                       ),
                     ),
-                    if (experience.host.isVerified) ...[
+                    if (host.isVerified) ...[
                       const SizedBox(width: 8),
                       const Icon(
                         Icons.verified,
@@ -235,7 +238,7 @@ class ExperienceDetailScreen extends StatelessWidget {
                 const SizedBox(height: 4),
 
                 Text(
-                  'Host since ${experience.host.memberSince}',
+                  'Host since ${experience.hostMemberSince.year}',
                   style: AppTypography.bodySmall.copyWith(
                     color: AppColors.textSecondary,
                   ),
@@ -248,7 +251,7 @@ class ExperienceDetailScreen extends StatelessWidget {
                   spacing: 16,
                   children: [
                     Text(
-                      'Verified • Speaks ${experience.host.languages.length} languages • ${experience.host.responseRate} response rate',
+                      '${experience.isHostVerified ? 'Verified' : 'Unverified'} • Speaks ${experience.hostLanguages.length} languages • ${experience.hostResponseRate} response rate',
                       style: AppTypography.bodySmall.copyWith(
                         color: AppColors.textSecondary,
                       ),
@@ -277,7 +280,7 @@ class ExperienceDetailScreen extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           Text(
-            experience.description,
+            experience.summary,
             style: AppTypography.bodyMedium.copyWith(
               color: AppColors.textPrimary,
               height: 1.6,
@@ -404,6 +407,9 @@ class ExperienceDetailScreen extends StatelessWidget {
   }
 
   Widget _buildBottomActions(BuildContext context, Experience experience) {
+    final host = experience.host;
+    if (host == null) return const SizedBox.shrink();
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -422,7 +428,7 @@ class ExperienceDetailScreen extends StatelessWidget {
             // Message Host button
             Expanded(
               child: OutlinedButton.icon(
-                onPressed: () => _messageHost(context, experience.host.id),
+                onPressed: () => _messageHost(context, host.id),
                 icon: const Icon(Icons.message_outlined),
                 label: const Text('Message Host'),
                 style: OutlinedButton.styleFrom(

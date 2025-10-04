@@ -239,7 +239,7 @@ class _MapScreenState extends State<MapScreen> {
                             ),
                             const SizedBox(width: 4),
                             Text(
-                              experience.rating.toString(),
+                              experience.avgRating.toString(),
                               style: AppTypography.labelSmall.copyWith(
                                 color: AppColors.white,
                                 fontWeight: FontWeight.w600,
@@ -257,13 +257,13 @@ class _MapScreenState extends State<MapScreen> {
                   Row(
                     children: [
                       Text(
-                        experience.host.name,
+                        experience.hostName,
                         style: AppTypography.bodyMedium.copyWith(
                           color: AppColors.textSecondary,
                           fontWeight: FontWeight.w500,
                         ),
                       ),
-                      if (experience.host.isVerified) ...[
+                      if (experience.isHostVerified) ...[
                         const SizedBox(width: 4),
                         const Icon(
                           Icons.verified,
@@ -279,7 +279,7 @@ class _MapScreenState extends State<MapScreen> {
                       ),
                       const SizedBox(width: 4),
                       Text(
-                        experience.location,
+                        experience.department,
                         style: AppTypography.bodySmall.copyWith(
                           color: AppColors.textSecondary,
                         ),
