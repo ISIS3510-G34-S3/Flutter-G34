@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:location/location.dart';
-import 'dart:math' show cos, sqrt, asin, sin, atan2, pi;
+import 'dart:math' show cos, sqrt, sin, atan2, pi;
 import 'package:travel_connect/models/experience.dart';
 import 'package:travel_connect/services/experience_service.dart';
 import '../../theme/colors.dart';
@@ -305,14 +305,14 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
         final distanceA = _calculateHaversineDistance(
           _currentLocation!.latitude!,
           _currentLocation!.longitude!,
-          a.location['latitude'],
-          a.location['longitude'],
+          a.location.latitude,
+          a.location.longitude,
         );
         final distanceB = _calculateHaversineDistance(
           _currentLocation!.latitude!,
           _currentLocation!.longitude!,
-          b.location['latitude'],
-          b.location['longitude'],
+          b.location.latitude,
+          b.location.longitude,
         );
         return distanceA.compareTo(distanceB);
       });

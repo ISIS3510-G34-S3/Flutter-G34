@@ -6,7 +6,7 @@ class Experience {
   final String summary;
   final String hostId;
   final bool hostVerified;
-  final Map<String, dynamic> location;
+  final GeoPoint location;
   final String department;
   final double avgRating;
   final int reviewsCount;
@@ -52,7 +52,7 @@ class Experience {
       summary: data['summary'] ?? '',
       hostId: data['hostId'] ?? '',
       hostVerified: data['hostVerified'] ?? false,
-      location: data['location'] is Map ? Map<String, dynamic>.from(data['location']) : {},
+      location: data['location'] as GeoPoint,
       department: data['department'] ?? '',
       avgRating: (data['avgRating'] as num?)?.toDouble() ?? 0.0,
       reviewsCount: data['reviewsCount'] ?? 0,

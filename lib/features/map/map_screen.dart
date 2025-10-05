@@ -67,7 +67,7 @@ class _MapScreenState extends State<MapScreen> {
         Marker(
           markerId: MarkerId(experience.id),
           position: LatLng(
-              experience.location["latitude"], experience.location["longitude"]),
+              experience.location.latitude, experience.location.longitude),
           infoWindow: InfoWindow(
             title: experience.title,
             snippet: '${experience.avgRating}⭐',
