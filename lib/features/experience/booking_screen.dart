@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:travel_connect/models/experience.dart';
+import 'package:travel_connect/services/experience_service.dart';
 import '../../theme/colors.dart';
 import '../../theme/typography.dart';
-import '../../mock/mock_data.dart';
 
 /// Booking screen for scheduling an experience
 class BookingScreen extends StatefulWidget {
@@ -18,17 +19,58 @@ class BookingScreen extends StatefulWidget {
 }
 
 class _BookingScreenState extends State<BookingScreen> {
+  final ExperienceService _experienceService = ExperienceService();
+  Experience? _experience;
+  bool _isLoading = true;
+
   DateTime? selectedDate;
   DateTime currentMonth = DateTime.now();
   int guests = 1;
   String selectedTime = '10:00 AM';
-  
+
   final List<String> timeSlots = ['10:00 AM', '2:00 PM', '6:00 PM'];
 
   @override
+  void initState() {
+    super.initState();
+    _fetchExperience();
+  }
+
+  Future<void> _fetchExperience() async {
+    try {
+      final experience =
+          await _experienceService.getExperienceById(widget.experienceId);
+      if (mounted) {
+        setState(() {
+          _experience = experience;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+      // Optionally, show an error message
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final experience = MockData.getExperienceById(widget.experienceId);
-    if (experience == null) return const SizedBox();
+    if (_isLoading) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Book Experience')),
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (_experience == null) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Error')),
+        body: const Center(child: Text('Experience not found.')),
+      );
+    }
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -53,7 +95,7 @@ class _BookingScreenState extends State<BookingScreen> {
                   width: 60,
                   height: 60,
                   decoration: BoxDecoration(
-                    color: AppColors.peach.withValues(alpha: 0.3),
+                    color: AppColors.peach.withOpacity(0.3),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: const Icon(
@@ -67,25 +109,12 @@ class _BookingScreenState extends State<BookingScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        experience.title,
-                        style: AppTypography.titleSmall.copyWith(
-                          color: AppColors.textPrimary,
-                        ),
+                        _experience!.title,
+                        style: AppTypography.titleSmall,
                       ),
+                      const SizedBox(height: 4),
                       Text(
-                        experience.hostName,
-                        style: AppTypography.bodySmall.copyWith(
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                      Text(
-                        experience.department ,
-                        style: AppTypography.bodySmall.copyWith(
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                      Text(
-                        '${experience.duration} days • ${experience.categories.isNotEmpty ? experience.categories.first : 'Experience'}',
+                        '${_experience!.duration} days • ${_experience!.categories.isNotEmpty ? _experience!.categories.first : 'Experience'}',
                         style: AppTypography.bodySmall.copyWith(
                           color: AppColors.textSecondary,
                         ),
@@ -362,6 +391,7 @@ class _BookingScreenState extends State<BookingScreen> {
   }
 
   Widget _buildBookingSummary() {
+    final total = _experience!.priceCOP * guests;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -371,13 +401,13 @@ class _BookingScreenState extends State<BookingScreen> {
       ),
       child: Column(
         children: [
-          _buildSummaryRow('Date', selectedDate != null 
+          _buildSummaryRow('Date', selectedDate != null
               ? '${selectedDate!.year}-${selectedDate!.month.toString().padLeft(2, '0')}-${selectedDate!.day.toString().padLeft(2, '0')}'
               : 'Not selected'),
           _buildSummaryRow('Time', selectedTime),
           _buildSummaryRow('Guests', guests.toString()),
           const Divider(),
-          _buildSummaryRow('Total', '\$75.00', isTotal: true),
+          _buildSummaryRow('Total', '\$${total.toStringAsFixed(2)} COP', isTotal: true),
         ],
       ),
     );
@@ -409,6 +439,7 @@ class _BookingScreenState extends State<BookingScreen> {
   }
 
   Widget _buildBottomAction() {
+    final total = _experience!.priceCOP * guests;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -439,7 +470,7 @@ class _BookingScreenState extends State<BookingScreen> {
               backgroundColor: AppColors.forestGreen,
             ),
             child: Text(
-              'Confirm Booking • \$75.00',
+              'Confirm Booking • \$${total.toStringAsFixed(2)} COP',
               style: AppTypography.buttonLarge.copyWith(
                 color: AppColors.white,
               ),

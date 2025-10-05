@@ -151,7 +151,7 @@ class MockData {
   /// Mock hosts data
   static final List<Host> hosts = [
     Host(
-      id: 'host_1',
+      id: 'mNMCsoaBSJKnda5UGbAc',
       name: 'Carlos Mendoza',
       email: 'carlos.mendoza@email.com',
       isVerified: true,

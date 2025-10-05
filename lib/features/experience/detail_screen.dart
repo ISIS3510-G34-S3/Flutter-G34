@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:travel_connect/models/experience.dart';
+import 'package:travel_connect/services/experience_service.dart';
 import '../../theme/colors.dart';
 import '../../theme/typography.dart';
-import '../../mock/mock_data.dart';
 
 /// Experience detail screen showing full information about an experience
-class ExperienceDetailScreen extends StatelessWidget {
+class ExperienceDetailScreen extends StatefulWidget {
   const ExperienceDetailScreen({
     super.key,
     required this.experienceId,
@@ -14,10 +15,46 @@ class ExperienceDetailScreen extends StatelessWidget {
   final String experienceId;
 
   @override
-  Widget build(BuildContext context) {
-    final experience = MockData.getExperienceById(experienceId);
+  State<ExperienceDetailScreen> createState() => _ExperienceDetailScreenState();
+}
 
-    if (experience == null) {
+class _ExperienceDetailScreenState extends State<ExperienceDetailScreen> {
+  final ExperienceService _experienceService = ExperienceService();
+  Experience? _experience;
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchExperience();
+  }
+
+  Future<void> _fetchExperience() async {
+    try {
+      final experience =
+          await _experienceService.getExperienceById(widget.experienceId);
+      setState(() {
+        _experience = experience;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+      });
+      // Handle error
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_isLoading) {
+      return Scaffold(
+        appBar: AppBar(),
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (_experience == null) {
       return Scaffold(
         appBar: AppBar(
           title: const Text('Experience Not Found'),
@@ -32,7 +69,7 @@ class ExperienceDetailScreen extends StatelessWidget {
       body: CustomScrollView(
         slivers: [
           // App bar with image
-          _buildSliverAppBar(context, experience),
+          _buildSliverAppBar(context, _experience!),
 
           // Content
           SliverToBoxAdapter(
@@ -40,16 +77,16 @@ class ExperienceDetailScreen extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // Title and rating section
-                _buildTitleSection(experience),
+                _buildTitleSection(_experience!),
 
-                // Host section
-                _buildHostSection(experience),
+                // Host section (assuming you have a way to get host data)
+                // _buildHostSection(_experience!),
 
                 // About section
-                _buildAboutSection(experience),
+                _buildAboutSection(_experience!),
 
                 // Skills exchange section
-                _buildSkillsSection(experience),
+                _buildSkillsSection(_experience!),
 
                 const SizedBox(height: 120), // Space for bottom actions
               ],
@@ -59,7 +96,7 @@ class ExperienceDetailScreen extends StatelessWidget {
       ),
 
       // Bottom action bar
-      bottomNavigationBar: _buildBottomActions(context, experience),
+      bottomNavigationBar: _buildBottomActions(context, _experience!),
     );
   }
 
@@ -76,33 +113,46 @@ class ExperienceDetailScreen extends StatelessWidget {
         background: Stack(
           fit: StackFit.expand,
           children: [
-            // Image placeholder
-            Container(
-              color: AppColors.peach.withValues(alpha: 0.3),
-              child: const Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.photo_camera_outlined,
-                    size: 48,
-                    color: AppColors.oliveGold,
-                  ),
-                  SizedBox(height: 8),
-                  Text(
-                    'Experience Photo',
-                    style: TextStyle(
+            // Image
+            if (experience.images.isNotEmpty)
+              Image.network(
+                experience.images.first,
+                fit: BoxFit.cover,
+              )
+            else
+              Container(
+                color: AppColors.peach.withOpacity(0.3),
+                child: const Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.photo_camera_outlined,
+                      size: 48,
                       color: AppColors.oliveGold,
-                      fontSize: 16,
                     ),
-                  ),
-                ],
+                    SizedBox(height: 8),
+                    Text(
+                      'No Image Available',
+                      style: TextStyle(
+                        color: AppColors.oliveGold,
+                        fontSize: 16,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
 
             // Gradient overlay
             Container(
               decoration: const BoxDecoration(
-                gradient: AppColors.overlayGradient,
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.transparent,
+                    Colors.black54,
+                  ],
+                ),
               ),
             ),
           ],
@@ -119,9 +169,7 @@ class ExperienceDetailScreen extends StatelessWidget {
         children: [
           Text(
             experience.title,
-            style: AppTypography.titleLarge.copyWith(
-              color: AppColors.textPrimary,
-            ),
+            style: AppTypography.titleLarge,
           ),
           const SizedBox(height: 12),
           Row(
@@ -144,7 +192,7 @@ class ExperienceDetailScreen extends StatelessWidget {
                     ),
                     const SizedBox(width: 4),
                     Text(
-                      '${experience.avgRating} (${experience.reviewsCount} reviews)',
+                      '${experience.avgRating.toStringAsFixed(1)} (${experience.reviewsCount} reviews)',
                       style: AppTypography.labelMedium.copyWith(
                         color: AppColors.white,
                         fontWeight: FontWeight.w600,
@@ -167,9 +215,7 @@ class ExperienceDetailScreen extends StatelessWidget {
                   const SizedBox(width: 4),
                   Text(
                     experience.department,
-                    style: AppTypography.bodyMedium.copyWith(
-                      color: AppColors.textSecondary,
-                    ),
+                    style: AppTypography.bodyMedium,
                   ),
                 ],
               ),
@@ -181,89 +227,10 @@ class ExperienceDetailScreen extends StatelessWidget {
   }
 
   Widget _buildHostSection(Experience experience) {
-    final host = experience.host;
-    if (host == null) return const SizedBox.shrink();
-
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.divider),
-      ),
-      child: Row(
-        children: [
-          // Avatar placeholder
-          Container(
-            width: 60,
-            height: 60,
-            decoration: BoxDecoration(
-              color: AppColors.peach.withValues(alpha: 0.3),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              Icons.person_outline,
-              size: 30,
-              color: AppColors.oliveGold.withValues(alpha: 0.7),
-            ),
-          ),
-
-          const SizedBox(width: 16),
-
-          // Host info
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Text(
-                      host.name,
-                      style: AppTypography.titleSmall.copyWith(
-                        color: AppColors.textPrimary,
-                      ),
-                    ),
-                    if (host.isVerified) ...[
-                      const SizedBox(width: 8),
-                      const Icon(
-                        Icons.verified,
-                        size: 18,
-                        color: AppColors.forestGreen,
-                      ),
-                    ],
-                  ],
-                ),
-
-                const SizedBox(height: 4),
-
-                Text(
-                  'Host since ${experience.hostMemberSince.year}',
-                  style: AppTypography.bodySmall.copyWith(
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-
-                const SizedBox(height: 8),
-
-                // Host meta info
-                Wrap(
-                  spacing: 16,
-                  children: [
-                    Text(
-                      '${experience.isHostVerified ? 'Verified' : 'Unverified'} • Speaks ${experience.hostLanguages.length} languages • ${experience.hostResponseRate} response rate',
-                      style: AppTypography.bodySmall.copyWith(
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
+    // This section is commented out as host data is not directly available
+    // in the experience model. You would need to fetch host data separately
+    // using the hostId from the experience.
+    return const SizedBox.shrink();
   }
 
   Widget _buildAboutSection(Experience experience) {
@@ -407,16 +374,13 @@ class ExperienceDetailScreen extends StatelessWidget {
   }
 
   Widget _buildBottomActions(BuildContext context, Experience experience) {
-    final host = experience.host;
-    if (host == null) return const SizedBox.shrink();
-
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppColors.white,
         boxShadow: [
           BoxShadow(
-            color: AppColors.textPrimary.withValues(alpha: 0.1),
+            color: AppColors.textPrimary.withOpacity(0.1),
             offset: const Offset(0, -2),
             blurRadius: 8,
           ),
@@ -428,7 +392,7 @@ class ExperienceDetailScreen extends StatelessWidget {
             // Message Host button
             Expanded(
               child: OutlinedButton.icon(
-                onPressed: () => _messageHost(context, host.id),
+                onPressed: () => _messageHost(context, experience.hostId),
                 icon: const Icon(Icons.message_outlined),
                 label: const Text('Message Host'),
                 style: OutlinedButton.styleFrom(
@@ -462,6 +426,6 @@ class ExperienceDetailScreen extends StatelessWidget {
   }
 
   void _bookExperience(BuildContext context) {
-    context.push('/booking/$experienceId');
+    context.push('/booking/${widget.experienceId}');
   }
 }

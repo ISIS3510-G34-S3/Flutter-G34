@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:travel_connect/models/experience.dart';
+import 'package:travel_connect/services/experience_service.dart';
 import '../../theme/colors.dart';
 import '../../theme/typography.dart';
-import '../../mock/mock_data.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:location/location.dart';
 
@@ -18,39 +19,74 @@ class _MapScreenState extends State<MapScreen> {
   Experience? _selectedExperience;
   GoogleMapController? _mapController;
   final Set<Marker> _markers = {};
-  
+  final ExperienceService _experienceService = ExperienceService();
+  bool _isLoading = true;
+
   // Location services
   final Location _location = Location();
   LocationData? _currentLocation;
-  
+
   // Default location (Bogotá, Colombia) - fallback if location not available
   final CameraPosition _initialPosition = const CameraPosition(
     target: LatLng(4.6097, -74.0817),
     zoom: 3.0,
   );
-  
+
   @override
   void initState() {
     super.initState();
-    _createMarkersFromExperiences();
+    _fetchExperiencesAndCreateMarkers();
     _initializeLocation();
   }
 
-  void _createMarkersFromExperiences() {
+  Future<void> _fetchExperiencesAndCreateMarkers() async {
+    try {
+      final experiences = await _experienceService.getExperiences();
+      final Set<Marker> markers = {};
+      for (final experience in experiences) {
+        markers.add(
+          Marker(
+            markerId: MarkerId(experience.id),
+            position: LatLng(experience.location["latitude"],
+                experience.location["longitude"]),
+            infoWindow: InfoWindow(
+              title: experience.title,
+              snippet: '${experience.avgRating}⭐',
+            ),
+            icon: experience.avgRating >= 4.8
+                ? BitmapDescriptor.defaultMarkerWithHue(
+                    BitmapDescriptor.hueGreen)
+                : BitmapDescriptor.defaultMarkerWithHue(
+                    BitmapDescriptor.hueOrange),
+            onTap: () => _selectExperience(experience),
+          ),
+        );
+      }
+      setState(() {
+        _markers.clear();
+        _markers.addAll(markers);
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+      });
+      // Handle error
+    }
+  }
+
+  void _createMarkersFromExperiences(List<Experience> experiences) {
     _markers.clear();
-    for (final experience in MockData.experiences) {
-      final double latitude = experience.location['latitude'] ?? 4.6097;
-      final double longitude = experience.location['longitude'] ?? -74.0817;
-      
+    for (final experience in experiences) {
       _markers.add(
         Marker(
           markerId: MarkerId(experience.id),
-          position: LatLng(latitude, longitude),
+          position: LatLng(experience.location["latitude"], experience.location["longitude"]),
           infoWindow: InfoWindow(
             title: experience.title,
-            snippet: '${experience.hostName} • ${experience.avgRating}⭐',
+            snippet: '${experience.avgRating}⭐',
           ),
-          icon: experience.avgRating >= 4.8 
+          icon: experience.avgRating >= 4.8
               ? BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen)
               : BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueOrange),
           onTap: () => _selectExperience(experience),
@@ -170,6 +206,12 @@ class _MapScreenState extends State<MapScreen> {
             },
           ),
 
+          // Loading indicator
+          if (_isLoading)
+            const Center(
+              child: CircularProgressIndicator(),
+            ),
+
           // Custom zoom controls
           _buildZoomControls(),
 
@@ -277,7 +319,7 @@ class _MapScreenState extends State<MapScreen> {
           borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
           boxShadow: [
             BoxShadow(
-              color: AppColors.textPrimary.withValues(alpha: 0.2),
+              color: AppColors.textPrimary.withOpacity(0.2),
               offset: const Offset(0, -4),
               blurRadius: 12,
             ),
@@ -310,132 +352,44 @@ class _MapScreenState extends State<MapScreen> {
                       Expanded(
                         child: Text(
                           experience.title,
-                          style: AppTypography.titleSmall.copyWith(
-                            color: AppColors.textPrimary,
-                          ),
+                          style: AppTypography.titleSmall,
                         ),
                       ),
-
                       const SizedBox(width: 8),
-
-                      // Rating chip
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: AppColors.oliveGold,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(
-                              Icons.star,
-                              size: 14,
-                              color: AppColors.white,
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              experience.avgRating.toString(),
-                              style: AppTypography.labelSmall.copyWith(
-                                color: AppColors.white,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
-                        ),
+                      Row(
+                        children: [
+                          const Icon(
+                            Icons.star,
+                            size: 16,
+                            color: AppColors.oliveGold,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            experience.avgRating.toStringAsFixed(1),
+                            style: AppTypography.bodyMedium,
+                          ),
+                        ],
                       ),
                     ],
                   ),
 
                   const SizedBox(height: 8),
 
-                  // Host and location
+                  // Location
                   Row(
                     children: [
-                      Text(
-                        experience.hostName,
-                        style: AppTypography.bodyMedium.copyWith(
-                          color: AppColors.textSecondary,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      if (experience.isHostVerified) ...[
-                        const SizedBox(width: 4),
-                        const Icon(
-                          Icons.verified,
-                          size: 16,
-                          color: AppColors.forestGreen,
-                        ),
-                      ],
-                      const Spacer(),
                       const Icon(
-                        Icons.location_on,
+                        Icons.location_on_outlined,
                         size: 16,
                         color: AppColors.textSecondary,
                       ),
                       const SizedBox(width: 4),
-                      Text(
-                        experience.department,
-                        style: AppTypography.bodySmall.copyWith(
-                          color: AppColors.textSecondary,
+                      Expanded(
+                        child: Text(
+                          experience.department,
+                          style: AppTypography.bodySmall,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                      ),
-                    ],
-                  ),
-
-                  const SizedBox(height: 12),
-
-                  // Skills
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Learn skills
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Icon(
-                            Icons.school_outlined,
-                            size: 16,
-                            color: AppColors.forestGreen,
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              experience.skillsToLearn.join(', '),
-                              style: AppTypography.bodySmall.copyWith(
-                                color: AppColors.textPrimary,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ],
-                      ),
-
-                      const SizedBox(height: 4),
-
-                      // Teach skills
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Icon(
-                            Icons.lightbulb_outlined,
-                            size: 16,
-                            color: AppColors.lava,
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              experience.skillsToTeach.join(', '),
-                              style: AppTypography.bodySmall.copyWith(
-                                color: AppColors.textPrimary,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ],
                       ),
                     ],
                   ),
