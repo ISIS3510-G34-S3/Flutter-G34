@@ -9,12 +9,18 @@ class FiltersBottomSheet extends StatefulWidget {
     super.key,
     required this.selectedCategories,
     required this.selectedRegions,
+    required this.selectedLanguages,
+    required this.minPrice,
+    required this.maxPrice,
     required this.onApplyFilters,
   });
 
   final List<String> selectedCategories;
   final List<String> selectedRegions;
-  final Function(List<String> categories, List<String> regions) onApplyFilters;
+  final List<String> selectedLanguages;
+  final double minPrice;
+  final double maxPrice;
+  final Function(List<String> categories, List<String> regions, List<String> languages, double minPrice, double maxPrice) onApplyFilters;
 
   @override
   State<FiltersBottomSheet> createState() => _FiltersBottomSheetState();
@@ -32,7 +38,8 @@ class _FiltersBottomSheetState extends State<FiltersBottomSheet> {
     super.initState();
     _selectedCategories = List.from(widget.selectedCategories);
     _selectedRegions = List.from(widget.selectedRegions);
-    _selectedLanguages = [];
+    _selectedLanguages = List.from(widget.selectedLanguages);
+    _maxPrice = widget.maxPrice > 0 ? widget.maxPrice : 100.0;
   }
 
   @override
@@ -354,7 +361,7 @@ class _FiltersBottomSheetState extends State<FiltersBottomSheet> {
   }
 
   void _applyFilters() {
-    widget.onApplyFilters(_selectedCategories, _selectedRegions);
+    widget.onApplyFilters(_selectedCategories, _selectedRegions, _selectedLanguages, 0.0, _maxPrice);
     Navigator.of(context).pop();
 
     // Show feedback
