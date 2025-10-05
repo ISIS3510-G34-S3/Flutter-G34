@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:google_sign_in/google_sign_in.dart';
+import 'package:flutter/services.dart' show PlatformException;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import '../../theme/colors.dart';
 import '../../theme/typography.dart';
 
@@ -91,6 +94,19 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                 _buildCreateAccountButton(),
 
                 const SizedBox(height: 24),
+
+                // Or sign up with Google
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: _isLoading ? null : _handleGoogleSignUp,
+                    icon: const Icon(Icons.login),
+                    label: Text(
+                      'Sign up with Google',
+                      style: AppTypography.buttonMedium,
+                    ),
+                  ),
+                ),
               ],
             ),
           ),
@@ -489,6 +505,91 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Unexpected error creating account'),
+          backgroundColor: AppColors.lava,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _handleGoogleSignUp() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final GoogleSignIn googleSignIn = kIsWeb
+          ? GoogleSignIn(
+              clientId:
+                  '994400477277-ropltmpc3ec8ovelbgac7feice2d5qct.apps.googleusercontent.com',
+              scopes: <String>['email'],
+            )
+          : GoogleSignIn(
+              serverClientId:
+                  '994400477277-ropltmpc3ec8ovelbgac7feice2d5qct.apps.googleusercontent.com',
+              scopes: <String>['email'],
+            );
+
+      final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
+      if (googleUser == null) {
+        return; // cancelled
+      }
+      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+
+      final credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+
+      final userCred = await FirebaseAuth.instance.signInWithCredential(credential);
+      final user = userCred.user;
+      if (user != null) {
+        await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+          'uid': user.uid,
+          'email': user.email,
+          'displayName': user.displayName,
+          'photoURL': user.photoURL,
+          'userType': _selectedUserType,
+          'provider': 'google',
+          'createdAt': FieldValue.serverTimestamp(),
+          'lastSignInAt': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Signed in as ${user.displayName ?? user.email ?? 'Google user'}'),
+            backgroundColor: AppColors.forestGreen,
+          ),
+        );
+        context.go('/discover');
+      }
+    } on FirebaseAuthException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('[FirebaseAuth:${e.code}] ${e.message ?? 'Google sign-in failed'}'),
+          backgroundColor: AppColors.lava,
+        ),
+      );
+    } on PlatformException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('[Platform:${e.code}] ${e.message ?? 'Platform error during Google sign-in'}'),
+          backgroundColor: AppColors.lava,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Unexpected error during Google sign-in: $e'),
           backgroundColor: AppColors.lava,
         ),
       );
