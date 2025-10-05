@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:location/location.dart';
+import 'dart:math' show cos, sqrt, asin, sin, atan2, pi;
 import 'package:travel_connect/models/experience.dart';
 import 'package:travel_connect/services/experience_service.dart';
 import '../../theme/colors.dart';
@@ -25,10 +27,48 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   final ExperienceService _experienceService = ExperienceService();
   bool _isLoading = true;
 
+  // Location services
+  final Location _location = Location();
+  LocationData? _currentLocation;
+
   @override
   void initState() {
     super.initState();
-    _fetchExperiences();
+    _initializeAndFetch();
+  }
+
+  Future<void> _initializeAndFetch() async {
+    await _initializeLocation();
+    await _fetchExperiences();
+  }
+
+  /// Initialize location services and get current location
+  Future<void> _initializeLocation() async {
+    try {
+      // Check if location service is enabled
+      bool serviceEnabled = await _location.serviceEnabled();
+      if (!serviceEnabled) {
+        serviceEnabled = await _location.requestService();
+        if (!serviceEnabled) {
+          return;
+        }
+      }
+
+      // Check location permissions
+      PermissionStatus permissionGranted = await _location.hasPermission();
+      if (permissionGranted == PermissionStatus.denied) {
+        permissionGranted = await _location.requestPermission();
+        if (permissionGranted != PermissionStatus.granted) {
+          return;
+        }
+      }
+
+      // Get current location
+      _currentLocation = await _location.getLocation();
+    } catch (e) {
+      debugPrint('Error initializing location: $e');
+      // Optionally show a message to the user
+    }
   }
 
   Future<void> _fetchExperiences() async {
@@ -36,7 +76,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
       final experiences = await _experienceService.getExperiences();
       setState(() {
         _allExperiences = experiences;
-        _filteredExperiences = experiences;
+        _filterExperiences(); // This will also handle initial sorting
         _isLoading = false;
       });
     } catch (e) {
@@ -259,6 +299,25 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
           .toList();
     }
 
+    // Sort by distance if location is available
+    if (_currentLocation != null) {
+      experiences.sort((a, b) {
+        final distanceA = _calculateHaversineDistance(
+          _currentLocation!.latitude!,
+          _currentLocation!.longitude!,
+          a.location['latitude'],
+          a.location['longitude'],
+        );
+        final distanceB = _calculateHaversineDistance(
+          _currentLocation!.latitude!,
+          _currentLocation!.longitude!,
+          b.location['latitude'],
+          b.location['longitude'],
+        );
+        return distanceA.compareTo(distanceB);
+      });
+    }
+
     // NOTE: Region filtering is not implemented as it's not in the new model
 
     setState(() {
@@ -288,6 +347,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
       _selectedCategories.clear();
       _selectedRegions.clear();
       _filteredExperiences = _allExperiences;
+      _filterExperiences();
     });
   }
 
@@ -318,5 +378,25 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
 
   void _navigateToExperience(String experienceId) {
     context.push('/experience/$experienceId');
+  }
+
+  /// Calculates the distance between two coordinates using the Haversine formula.
+  double _calculateHaversineDistance(
+      double lat1, double lon1, double lat2, double lon2) {
+    const R = 6371; // Earth's radius in kilometers
+    final dLat = _toRadians(lat2 - lat1);
+    final dLon = _toRadians(lon2 - lon1);
+    final lat1Rad = _toRadians(lat1);
+    final lat2Rad = _toRadians(lat2);
+
+    final a = sin(dLat / 2) * sin(dLat / 2) +
+        cos(lat1Rad) * cos(lat2Rad) * sin(dLon / 2) * sin(dLon / 2);
+    final c = 2 * atan2(sqrt(a), sqrt(1 - a));
+
+    return R * c;
+  }
+
+  double _toRadians(double degree) {
+    return degree * (pi / 180);
   }
 }
