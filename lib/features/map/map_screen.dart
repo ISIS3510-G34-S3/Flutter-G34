@@ -42,57 +42,45 @@ class _MapScreenState extends State<MapScreen> {
   Future<void> _fetchExperiencesAndCreateMarkers() async {
     try {
       final experiences = await _experienceService.getExperiences();
-      final Set<Marker> markers = {};
-      for (final experience in experiences) {
-        markers.add(
-          Marker(
-            markerId: MarkerId(experience.id),
-            position: LatLng(experience.location["latitude"],
-                experience.location["longitude"]),
-            infoWindow: InfoWindow(
-              title: experience.title,
-              snippet: '${experience.avgRating}⭐',
-            ),
-            icon: experience.avgRating >= 4.8
-                ? BitmapDescriptor.defaultMarkerWithHue(
-                    BitmapDescriptor.hueGreen)
-                : BitmapDescriptor.defaultMarkerWithHue(
-                    BitmapDescriptor.hueOrange),
-            onTap: () => _selectExperience(experience),
-          ),
-        );
+      final newMarkers = _createMarkersFromExperiences(experiences);
+      if (mounted) {
+        setState(() {
+          _markers.clear();
+          _markers.addAll(newMarkers);
+          _isLoading = false;
+        });
       }
-      setState(() {
-        _markers.clear();
-        _markers.addAll(markers);
-        _isLoading = false;
-      });
     } catch (e) {
-      setState(() {
-        _isLoading = false;
-      });
       // Handle error
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
-  void _createMarkersFromExperiences(List<Experience> experiences) {
-    _markers.clear();
+  Set<Marker> _createMarkersFromExperiences(List<Experience> experiences) {
+    final Set<Marker> newMarkers = {};
     for (final experience in experiences) {
-      _markers.add(
+      newMarkers.add(
         Marker(
           markerId: MarkerId(experience.id),
-          position: LatLng(experience.location["latitude"], experience.location["longitude"]),
+          position: LatLng(
+              experience.location.latitude, experience.location.longitude),
           infoWindow: InfoWindow(
             title: experience.title,
             snippet: '${experience.avgRating}⭐',
           ),
           icon: experience.avgRating >= 4.8
               ? BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen)
-              : BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueOrange),
+              : BitmapDescriptor.defaultMarkerWithHue(
+                  BitmapDescriptor.hueOrange),
           onTap: () => _selectExperience(experience),
         ),
       );
     }
+    return newMarkers;
   }
 
   /// Initialize location services and get current location
