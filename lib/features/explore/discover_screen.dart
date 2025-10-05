@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:travel_connect/models/experience.dart';
+import 'package:travel_connect/services/experience_service.dart';
 import '../../theme/colors.dart';
 import '../../theme/typography.dart';
-import '../../mock/mock_data.dart';
 import '../../widgets/experience_card.dart';
 import '../../widgets/filters_bottom_sheet.dart';
 
@@ -16,10 +17,35 @@ class DiscoverScreen extends StatefulWidget {
 
 class _DiscoverScreenState extends State<DiscoverScreen> {
   final _searchController = TextEditingController();
-  List<Experience> _filteredExperiences = MockData.experiences;
+  List<Experience> _allExperiences = [];
+  List<Experience> _filteredExperiences = [];
   String _searchQuery = '';
   List<String> _selectedCategories = [];
   List<String> _selectedRegions = [];
+  final ExperienceService _experienceService = ExperienceService();
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchExperiences();
+  }
+
+  Future<void> _fetchExperiences() async {
+    try {
+      final experiences = await _experienceService.getExperiences();
+      setState(() {
+        _allExperiences = experiences;
+        _filteredExperiences = experiences;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+      });
+      // Handle error, maybe show a snackbar
+    }
+  }
 
   @override
   void dispose() {
@@ -48,7 +74,9 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
 
           // Experience list
           Expanded(
-            child: _buildExperienceList(),
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : _buildExperienceList(),
           ),
         ],
       ),
@@ -211,10 +239,37 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     );
   }
 
+  void _filterExperiences() {
+    List<Experience> experiences = _allExperiences;
+
+    // Filter by search query
+    if (_searchQuery.isNotEmpty) {
+      experiences = experiences
+          .where((exp) =>
+              exp.title.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+              exp.summary.toLowerCase().contains(_searchQuery.toLowerCase()))
+          .toList();
+    }
+
+    // Filter by category
+    if (_selectedCategories.isNotEmpty) {
+      experiences = experiences
+          .where((exp) =>
+              exp.categories.any((cat) => _selectedCategories.contains(cat)))
+          .toList();
+    }
+
+    // NOTE: Region filtering is not implemented as it's not in the new model
+
+    setState(() {
+      _filteredExperiences = experiences;
+    });
+  }
+
   void _handleSearchChanged(String value) {
     setState(() {
       _searchQuery = value;
-      _applyFilters();
+      _filterExperiences();
     });
   }
 
@@ -222,17 +277,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     _searchController.clear();
     setState(() {
       _searchQuery = '';
-      _applyFilters();
-    });
-  }
-
-  void _applyFilters() {
-    setState(() {
-      _filteredExperiences = MockData.filterExperiences(
-        searchQuery: _searchQuery.isNotEmpty ? _searchQuery : null,
-        categories: _selectedCategories.isNotEmpty ? _selectedCategories : null,
-        regions: _selectedRegions.isNotEmpty ? _selectedRegions : null,
-      );
+      _filterExperiences();
     });
   }
 
@@ -242,7 +287,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
       _searchQuery = '';
       _selectedCategories.clear();
       _selectedRegions.clear();
-      _filteredExperiences = MockData.experiences;
+      _filteredExperiences = _allExperiences;
     });
   }
 
@@ -260,7 +305,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
           setState(() {
             _selectedCategories = categories;
             _selectedRegions = regions;
-            _applyFilters();
+            _filterExperiences();
           });
         },
       ),

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:travel_connect/models/experience.dart';
 import '../theme/colors.dart';
 import '../theme/typography.dart';
-import '../mock/mock_data.dart';
 
 /// Experience card widget for displaying experience information in lists
 class ExperienceCard extends StatelessWidget {
@@ -27,7 +27,7 @@ class ExperienceCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Experience image placeholder
+            // Experience image
             _buildImageSection(),
 
             // Content section
@@ -41,18 +41,18 @@ class ExperienceCard extends StatelessWidget {
 
                   const SizedBox(height: 8),
 
-                  // Host and location
-                  _buildHostSection(),
+                  // Location
+                  _buildLocationSection(),
 
                   const SizedBox(height: 12),
 
-                  // Skills section
-                  _buildSkillsSection(),
-
-                  const SizedBox(height: 12),
-
-                  // Reviews and time
-                  _buildMetaSection(),
+                  // Price
+                  Text(
+                    '\$${experience.priceCOP} COP',
+                    style: AppTypography.titleMedium.copyWith(
+                      color: AppColors.forestGreen,
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -67,28 +67,38 @@ class ExperienceCard extends StatelessWidget {
       height: 180,
       width: double.infinity,
       decoration: BoxDecoration(
-        color: AppColors.peach.withValues(alpha: 0.3),
         borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+        image: experience.images.isNotEmpty
+            ? DecorationImage(
+                image: NetworkImage(experience.images.first),
+                fit: BoxFit.cover,
+              )
+            : null,
+        color: experience.images.isEmpty
+            ? AppColors.peach.withOpacity(0.3)
+            : Colors.transparent,
       ),
-      child: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.photo_camera_outlined,
-              size: 32,
-              color: AppColors.oliveGold.withValues(alpha: 0.7),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Experience Photo',
-              style: AppTypography.bodySmall.copyWith(
-                color: AppColors.oliveGold.withValues(alpha: 0.7),
+      child: experience.images.isEmpty
+          ? Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.photo_camera_outlined,
+                    size: 32,
+                    color: AppColors.oliveGold.withOpacity(0.7),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'No Image Available',
+                    style: AppTypography.bodySmall.copyWith(
+                      color: AppColors.oliveGold.withOpacity(0.7),
+                    ),
+                  ),
+                ],
               ),
-            ),
-          ],
-        ),
-      ),
+            )
+          : null,
     );
   }
 
@@ -100,104 +110,27 @@ class ExperienceCard extends StatelessWidget {
         Expanded(
           child: Text(
             experience.title,
-            style: AppTypography.titleSmall.copyWith(
-              color: AppColors.textPrimary,
-            ),
+            style: AppTypography.titleSmall,
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
           ),
         ),
 
-        const SizedBox(width: 8),
+        const SizedBox(width: 16),
 
-        // Rating chip
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          decoration: BoxDecoration(
-            color: AppColors.oliveGold,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(
-                Icons.star,
-                size: 14,
-                color: AppColors.white,
-              ),
-              const SizedBox(width: 4),
-              Text(
-                experience.avgRating.toString(),
-                style: AppTypography.labelSmall.copyWith(
-                  color: AppColors.white,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildHostSection() {
-    return Row(
-      children: [
-        // Avatar placeholder
-        Container(
-          width: 32,
-          height: 32,
-          decoration: BoxDecoration(
-            color: AppColors.peach.withValues(alpha: 0.3),
-            shape: BoxShape.circle,
-          ),
-          child: Icon(
-            Icons.person_outline,
-            size: 18,
-            color: AppColors.oliveGold.withValues(alpha: 0.7),
-          ),
-        ),
-
-        const SizedBox(width: 8),
-
-        // Host name with verified check
-        Expanded(
-          child: Row(
-            children: [
-              Text(
-                experience.hostName,
-                style: AppTypography.bodyMedium.copyWith(
-                  color: AppColors.textSecondary,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-              if (experience.isHostVerified) ...[
-                const SizedBox(width: 4),
-                const Icon(
-                  Icons.verified,
-                  size: 16,
-                  color: AppColors.forestGreen,
-                ),
-              ],
-            ],
-          ),
-        ),
-
-        const SizedBox(width: 8),
-
-        // Location with pin icon
+        // Rating
         Row(
           children: [
             const Icon(
-              Icons.location_on,
-              size: 16,
-              color: AppColors.textSecondary,
+              Icons.star,
+              color: AppColors.oliveGold,
+              size: 18,
             ),
             const SizedBox(width: 4),
             Text(
-              experience.department,
-              style: AppTypography.bodySmall.copyWith(
-                color: AppColors.textSecondary,
+              experience.avgRating.toStringAsFixed(1),
+              style: AppTypography.bodyMedium.copyWith(
+                fontWeight: FontWeight.bold,
               ),
             ),
           ],
@@ -206,81 +139,22 @@ class ExperienceCard extends StatelessWidget {
     );
   }
 
-  Widget _buildSkillsSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Learn skills
-        if (experience.skillsToLearn.isNotEmpty) ...[
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Icon(
-                Icons.school_outlined,
-                size: 16,
-                color: AppColors.forestGreen,
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  experience.skillsToLearn.join(', '),
-                  style: AppTypography.bodySmall.copyWith(
-                    color: AppColors.textPrimary,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 4),
-        ],
-
-        // Teach skills
-        if (experience.skillsToTeach.isNotEmpty) ...[
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Icon(
-                Icons.lightbulb_outlined,
-                size: 16,
-                color: AppColors.lava,
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  experience.skillsToTeach.join(', '),
-                  style: AppTypography.bodySmall.copyWith(
-                    color: AppColors.textPrimary,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ],
-    );
-  }
-
-  Widget _buildMetaSection() {
+  Widget _buildLocationSection() {
     return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        // Review count
-        Text(
-          '(${experience.reviewsCount} reviews)',
-          style: AppTypography.bodySmall.copyWith(
-            color: AppColors.textSecondary,
-          ),
+        const Icon(
+          Icons.location_on_outlined,
+          size: 16,
+          color: AppColors.textSecondary,
         ),
-
-        // Time ago
-        Text(
-          '${DateTime.now().difference(experience.createdAt).inDays} days ago',
-          style: AppTypography.bodySmall.copyWith(
-            color: AppColors.textSecondary,
+        const SizedBox(width: 4),
+        Expanded(
+          child: Text(
+            experience.department,
+            style: AppTypography.bodySmall.copyWith(
+              color: AppColors.textSecondary,
+            ),
+            overflow: TextOverflow.ellipsis,
           ),
         ),
       ],
