@@ -14,6 +14,7 @@ class Experience {
   final List<String> skillsToLearn;
   final List<String> skillsToTeach;
   final List<String> categories;
+  final List<String> languages;
   final DateTime createdAt;
   final int priceCOP;
   final int groupSizeMax;
@@ -35,6 +36,7 @@ class Experience {
     required this.skillsToLearn,
     required this.skillsToTeach,
     required this.categories,
+    required this.languages,
     required this.createdAt,
     required this.priceCOP,
     required this.groupSizeMax,
@@ -60,6 +62,7 @@ class Experience {
       skillsToLearn: List<String>.from(data['skillsToLearn'] ?? []),
       skillsToTeach: List<String>.from(data['skillsToTeach'] ?? []),
       categories: List<String>.from(data['categories'] ?? []),
+      languages: List<String>.from(data['languages'] ?? []),
       createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       priceCOP: data['priceCOP'] ?? 0,
       groupSizeMax: data['groupSizeMax'] ?? 0,

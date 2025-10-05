@@ -24,6 +24,9 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   String _searchQuery = '';
   List<String> _selectedCategories = [];
   List<String> _selectedRegions = [];
+  List<String> _selectedLanguages = [];
+  double _minPrice = 0;
+  double _maxPrice = double.infinity;
   final ExperienceService _experienceService = ExperienceService();
   bool _isLoading = true;
 
@@ -299,6 +302,30 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
           .toList();
     }
 
+    // Filter by region (department)
+    if (_selectedRegions.isNotEmpty) {
+      experiences = experiences
+          .where((exp) => _selectedRegions.contains(exp.department))
+          .toList();
+    }
+
+    // Filter by price range
+    if (_minPrice > 0 || _maxPrice < double.infinity) {
+      experiences = experiences
+          .where((exp) => 
+              exp.priceCOP >= _minPrice && 
+              exp.priceCOP <= _maxPrice)
+          .toList();
+    }
+
+    // Filter by languages
+    if (_selectedLanguages.isNotEmpty) {
+      experiences = experiences
+          .where((exp) =>
+              exp.languages.any((lang) => _selectedLanguages.contains(lang)))
+          .toList();
+    }
+
     // Sort by distance if location is available
     if (_currentLocation != null) {
       experiences.sort((a, b) {
@@ -346,7 +373,9 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
       _searchQuery = '';
       _selectedCategories.clear();
       _selectedRegions.clear();
-      _filteredExperiences = _allExperiences;
+      _selectedLanguages.clear();
+      _minPrice = 0;
+      _maxPrice = double.infinity;
       _filterExperiences();
     });
   }
@@ -361,15 +390,38 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
       builder: (context) => FiltersBottomSheet(
         selectedCategories: _selectedCategories,
         selectedRegions: _selectedRegions,
-        onApplyFilters: (categories, regions) {
+        selectedLanguages: _selectedLanguages,
+        minPrice: _minPrice,
+        maxPrice: _maxPrice == double.infinity ? 0 : _maxPrice,
+        onApplyFilters: (categories, regions, languages, minPrice, maxPrice) {
           setState(() {
             _selectedCategories = categories;
             _selectedRegions = regions;
+            _selectedLanguages = languages;
+            _minPrice = minPrice;
+            _maxPrice = maxPrice == 0 ? double.infinity : maxPrice;
             _filterExperiences();
           });
         },
       ),
     );
+  }
+
+  // Method to update price range filter
+  void updatePriceRange(double minPrice, double maxPrice) {
+    setState(() {
+      _minPrice = minPrice;
+      _maxPrice = maxPrice;
+      _filterExperiences();
+    });
+  }
+
+  // Method to update languages filter
+  void updateLanguages(List<String> languages) {
+    setState(() {
+      _selectedLanguages = languages;
+      _filterExperiences();
+    });
   }
 
   void _navigateToMap() {
