@@ -3,6 +3,8 @@ import 'package:go_router/go_router.dart';
 import '../../theme/colors.dart';
 import '../../theme/typography.dart';
 import '../../mock/mock_data.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 /// Profile screen showing user information and verification status
 class ProfileScreen extends StatelessWidget {
@@ -13,11 +15,39 @@ class ProfileScreen extends StatelessWidget {
 
   final String profileId;
 
+  Future<Host> _fetchCurrentUserHost() async {
+    final authUser = FirebaseAuth.instance.currentUser;
+    if (authUser == null) {
+      throw Exception('No authenticated user');
+    }
+
+    final docId = (authUser.email ?? '').toLowerCase().isNotEmpty
+        ? (authUser.email ?? '').toLowerCase()
+        : authUser.uid;
+
+    final doc = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(docId)
+        .get();
+    final data = doc.data() ?? <String, dynamic>{};
+
+    return Host(
+      id: authUser.uid,
+      name: (data['displayName'] ?? authUser.displayName ?? 'User') as String,
+      email: (data['email'] ?? authUser.email ?? '') as String,
+      isVerified: (data['isVerified'] ?? false) as bool,
+      memberSince:
+          (data['createdAt'] is Timestamp) ? (data['createdAt'] as Timestamp).toDate() : DateTime.now(),
+      languages: List<String>.from((data['languages'] ?? const <String>[]) as List),
+      responseRate: (data['responseRate'] ?? '100%') as String,
+      about: (data['about'] ?? 'Tell others about yourself.') as String,
+      hostedExperiences: (data['hostedExperiences'] ?? 0) as int,
+      joinedExperiences: (data['joinedExperiences'] ?? 0) as int,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    // For this demo, we'll always show the current user profile
-    final user = MockData.currentUser;
-
     return Scaffold(
       appBar: AppBar(
         title: Text(
@@ -40,44 +70,50 @@ class ProfileScreen extends StatelessWidget {
           ),
         ],
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          // Profile header card
-          _buildProfileHeader(user),
+      body: FutureBuilder<Host>(
+        future: _fetchCurrentUserHost(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (snapshot.hasError) {
+            return Center(
+              child: Text(
+                'Failed to load profile',
+                style: AppTypography.bodyMedium.copyWith(color: AppColors.textPrimary),
+              ),
+            );
+          }
+          final user = snapshot.data;
+          if (user == null) {
+            return Center(
+              child: Text(
+                'No profile data',
+                style: AppTypography.bodyMedium.copyWith(color: AppColors.textPrimary),
+              ),
+            );
+          }
 
-          const SizedBox(height: 16),
-
-          // Verification banner
-          if (!user.isVerified) _buildVerificationBanner(context),
-
-          const SizedBox(height: 16),
-
-          // About section
-          _buildAboutSection(user),
-
-          const SizedBox(height: 16),
-
-          // Languages section
-          _buildLanguagesSection(user),
-
-          const SizedBox(height: 16),
-
-          // My experiences section
-          _buildExperiencesSection(user),
-
-          const SizedBox(height: 16),
-
-          // Achievements section
-          _buildAchievementsSection(),
-
-          const SizedBox(height: 16),
-
-          // Settings section
-          _buildSettingsSection(context),
-
-          const SizedBox(height: 32),
-        ],
+          return ListView(
+            padding: const EdgeInsets.all(16),
+            children: [
+              _buildProfileHeader(user),
+              const SizedBox(height: 16),
+              if (!user.isVerified) _buildVerificationBanner(context),
+              const SizedBox(height: 16),
+              _buildAboutSection(user),
+              const SizedBox(height: 16),
+              _buildLanguagesSection(user),
+              const SizedBox(height: 16),
+              _buildExperiencesSection(user),
+              const SizedBox(height: 16),
+              _buildAchievementsSection(),
+              const SizedBox(height: 16),
+              _buildSettingsSection(context),
+              const SizedBox(height: 32),
+            ],
+          );
+        },
       ),
     );
   }
