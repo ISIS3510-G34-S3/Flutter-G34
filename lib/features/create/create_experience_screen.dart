@@ -2,6 +2,11 @@ import 'package:flutter/material.dart';
 import '../../theme/colors.dart';
 import '../../theme/typography.dart';
 import '../../mock/mock_data.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+import 'dart:async';
 
 /// Create experience screen with form for adding new experiences
 class CreateExperienceScreen extends StatefulWidget {
@@ -16,21 +21,42 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
   final _titleController = TextEditingController();
   final _descriptionController = TextEditingController();
   final _durationController = TextEditingController();
-  final _locationController = TextEditingController();
+  final _departmentController = TextEditingController();
+  final _priceController = TextEditingController();
+  final _groupSizeController = TextEditingController();
+  final _locationSearchController = TextEditingController();
   final _skillsToTeachController = TextEditingController();
   final _skillsToLearnController = TextEditingController();
 
-  String? _selectedCategory;
+  List<String> _selectedCategories = [];
+  List<String> _selectedLanguages = [];
+  List<String> _selectedPaymentOptions = [];
+  final List<String> _imageUrls = [];
+  GeoPoint? _selectedGeoPoint;
+  String? _selectedLocationLabel;
   bool _isLoading = false;
+
+  static const List<String> _languageOptions = ['es', 'en', 'pt', 'fr'];
+  static const List<String> _paymentOptions = ['cash', 'card'];
+  static const String _placesApiKey = String.fromEnvironment('GOOGLE_PLACES_API_KEY', defaultValue: 'AIzaSyA0TPkWq9uNvEA0Qhw2NVBihLbRTroYabE');
+
+  // Google Places typeahead state
+  List<Map<String, dynamic>> _placeSuggestions = [];
+  bool _isFetchingPlaces = false;
+  Timer? _placesDebounce;
 
   @override
   void dispose() {
     _titleController.dispose();
     _descriptionController.dispose();
     _durationController.dispose();
-    _locationController.dispose();
+    _departmentController.dispose();
+    _priceController.dispose();
+    _groupSizeController.dispose();
+    _locationSearchController.dispose();
     _skillsToTeachController.dispose();
     _skillsToLearnController.dispose();
+    _placesDebounce?.cancel();
     super.dispose();
   }
 
@@ -102,15 +128,15 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
             const SizedBox(height: 20),
 
             // Category dropdown
-            _buildCategoryDropdown(),
+            _buildCategoryMultiSelect(),
 
             const SizedBox(height: 20),
 
-            // Duration field
+            // Duration field (hours or days number)
             _buildTextField(
               label: 'Duration',
               controller: _durationController,
-              hint: '3 hours',
+              hint: '3 (hours/days)',
               validator: (value) {
                 if (value == null || value.isEmpty) {
                   return 'Please enter duration';
@@ -121,19 +147,53 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
 
             const SizedBox(height: 20),
 
-            // Location
+            // Department
             _buildTextField(
-              label: 'Location',
-              controller: _locationController,
-              hint: 'Where will this take place?',
-              prefixIcon: Icons.location_on_outlined,
+              label: 'Department',
+              controller: _departmentController,
+              hint: 'e.g. Tolima',
               validator: (value) {
                 if (value == null || value.isEmpty) {
-                  return 'Please enter a location';
+                  return 'Please enter a department';
                 }
                 return null;
               },
             ),
+
+            const SizedBox(height: 20),
+
+            // Price COP
+            _buildTextField(
+              label: 'Price (COP)',
+              controller: _priceController,
+              hint: 'e.g. 120000',
+              validator: (value) {
+                if (value == null || value.isEmpty) {
+                  return 'Please enter a price';
+                }
+                return null;
+              },
+            ),
+
+            const SizedBox(height: 20),
+
+            // Group size
+            _buildTextField(
+              label: 'Max Group Size',
+              controller: _groupSizeController,
+              hint: 'e.g. 8',
+              validator: (value) {
+                if (value == null || value.isEmpty) {
+                  return 'Please enter max group size';
+                }
+                return null;
+              },
+            ),
+
+            const SizedBox(height: 20),
+
+            // Location picker with Google Places search
+            _buildLocationPicker(),
 
             const SizedBox(height: 20),
 
@@ -167,6 +227,47 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
                 return null;
               },
             ),
+
+            const SizedBox(height: 20),
+
+            // Languages
+            _buildChipsSection(
+              label: 'Languages',
+              options: _languageOptions,
+              selected: _selectedLanguages,
+              onToggle: (value) {
+                setState(() {
+                  if (_selectedLanguages.contains(value)) {
+                    _selectedLanguages.remove(value);
+                  } else {
+                    _selectedLanguages.add(value);
+                  }
+                });
+              },
+            ),
+
+            const SizedBox(height: 20),
+
+            // Payment Options
+            _buildChipsSection(
+              label: 'Payment Options',
+              options: _paymentOptions,
+              selected: _selectedPaymentOptions,
+              onToggle: (value) {
+                setState(() {
+                  if (_selectedPaymentOptions.contains(value)) {
+                    _selectedPaymentOptions.remove(value);
+                  } else {
+                    _selectedPaymentOptions.add(value);
+                  }
+                });
+              },
+            ),
+
+            const SizedBox(height: 20),
+
+            // Image URLs
+            _buildImagesInput(),
 
             const SizedBox(height: 32),
           ],
@@ -285,66 +386,292 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
     );
   }
 
-  Widget _buildCategoryDropdown() {
+  // Removed old dropdown; replaced by multi-select
+
+  Widget _buildCategoryMultiSelect() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Category',
+          'Categories',
           style: AppTypography.labelLarge.copyWith(
             color: AppColors.textPrimary,
             fontWeight: FontWeight.w600,
           ),
         ),
         const SizedBox(height: 8),
-        DropdownButtonFormField<String>(
-          value: _selectedCategory,
-          isExpanded: true,
-          decoration: InputDecoration(
-            hintText: 'Category',
-            hintStyle: AppTypography.bodySmall.copyWith(
-              color: Colors.grey, // Add explicit color
-            ),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: AppColors.divider),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: AppColors.divider),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide:
-                  const BorderSide(color: AppColors.forestGreen, width: 2),
-            ),
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-          ),
-          items: MockData.categories.map((category) {
-            return DropdownMenuItem(
-              value: category,
-              child: Text(
-                category,
-                overflow: TextOverflow.ellipsis,
-                style: AppTypography.bodyMedium,
-              ),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: MockData.categories.map((category) {
+            final isSelected = _selectedCategories.contains(category);
+            return FilterChip(
+              label: Text(category),
+              selected: isSelected,
+              onSelected: (selected) {
+                setState(() {
+                  if (selected) {
+                    _selectedCategories.add(category);
+                  } else {
+                    _selectedCategories.remove(category);
+                  }
+                });
+              },
             );
           }).toList(),
-          onChanged: (value) {
-            setState(() {
-              _selectedCategory = value;
-            });
-          },
-          validator: (value) {
-            if (value == null || value.isEmpty) {
-              return "Please Select a Category";
-            }
-            return null;
-          },
         ),
       ],
     );
+  }
+
+  Widget _buildChipsSection({
+    required String label,
+    required List<String> options,
+    required List<String> selected,
+    required void Function(String value) onToggle,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: AppTypography.labelLarge.copyWith(
+            color: AppColors.textPrimary,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: options.map((opt) {
+            final isSelected = selected.contains(opt);
+            return FilterChip(
+              label: Text(opt),
+              selected: isSelected,
+              onSelected: (_) => onToggle(opt),
+            );
+          }).toList(),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildImagesInput() {
+    final controller = TextEditingController();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Image URLs',
+          style: AppTypography.labelLarge.copyWith(
+            color: AppColors.textPrimary,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: controller,
+                decoration: const InputDecoration(hintText: 'https://...'),
+              ),
+            ),
+            const SizedBox(width: 8),
+            ElevatedButton(
+              onPressed: () {
+                final url = controller.text.trim();
+                if (url.isNotEmpty) {
+                  setState(() {
+                    _imageUrls.add(url);
+                  });
+                  controller.clear();
+                }
+              },
+              child: const Text('Add'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          children: _imageUrls
+              .map((u) => Chip(
+                    label: Text(u, overflow: TextOverflow.ellipsis),
+                    onDeleted: () {
+                      setState(() {
+                        _imageUrls.remove(u);
+                      });
+                    },
+                  ))
+              .toList(),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildLocationPicker() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Location',
+          style: AppTypography.labelLarge.copyWith(
+            color: AppColors.textPrimary,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 8),
+        TextField(
+          controller: _locationSearchController,
+          decoration: InputDecoration(
+            hintText: 'Search a place',
+            prefixIcon: const Icon(Icons.search),
+            suffixIcon: IconButton(
+              icon: const Icon(Icons.place_outlined),
+              onPressed: () => _openPlacesSearch(),
+            ),
+          ),
+          onChanged: _onPlaceQueryChanged,
+        ),
+        const SizedBox(height: 8),
+        if (_isFetchingPlaces) const LinearProgressIndicator(minHeight: 2),
+        if (_placeSuggestions.isNotEmpty)
+          Container(
+            decoration: BoxDecoration(
+              color: AppColors.white,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: AppColors.divider),
+            ),
+            constraints: const BoxConstraints(maxHeight: 240),
+            child: ListView.builder(
+              shrinkWrap: true,
+              itemCount: _placeSuggestions.length,
+              itemBuilder: (context, index) {
+                final s = _placeSuggestions[index];
+                return ListTile(
+                  dense: true,
+                  title: Text(
+                    (s['description'] as String?) ?? '',
+                    style: AppTypography.bodyMedium.copyWith(color: AppColors.textPrimary),
+                  ),
+                  onTap: () async {
+                    final placeId = s['place_id'] as String?;
+                    if (placeId != null) {
+                      final details = await _fetchPlaceDetails(placeId);
+                      if (!mounted) return;
+                      setState(() {
+                        _selectedGeoPoint = GeoPoint(details['lat']!, details['lng']!);
+                        _selectedLocationLabel = s['description'] as String?;
+                        _locationSearchController.text = _selectedLocationLabel ?? '';
+                        _placeSuggestions = [];
+                      });
+                    }
+                  },
+                );
+              },
+            ),
+          ),
+        if (_selectedLocationLabel != null)
+          Text(
+            'Selected: $_selectedLocationLabel',
+            style: AppTypography.bodySmall,
+          ),
+      ],
+    );
+  }
+
+  void _onPlaceQueryChanged(String value) {
+    _placesDebounce?.cancel();
+    if (_placesApiKey.isEmpty) return;
+    if (value.trim().isEmpty) {
+      setState(() {
+        _placeSuggestions = [];
+      });
+      return;
+    }
+    _placesDebounce = Timer(const Duration(milliseconds: 350), () async {
+      setState(() {
+        _isFetchingPlaces = true;
+      });
+      final results = await _fetchPlaceSuggestions(value.trim());
+      if (!mounted) return;
+      setState(() {
+        _placeSuggestions = results;
+        _isFetchingPlaces = false;
+      });
+    });
+  }
+
+  Future<void> _openPlacesSearch() async {
+    if (_placesApiKey.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Provide GOOGLE_PLACES_API_KEY to enable place search',
+            style: AppTypography.bodyMedium.copyWith(color: AppColors.white),
+          ),
+          backgroundColor: AppColors.lava,
+        ),
+      );
+      return;
+    }
+    final input = _locationSearchController.text.trim();
+    if (input.isEmpty) return;
+
+    final suggestions = await _fetchPlaceSuggestions(input);
+    if (!mounted) return;
+    await showModalBottomSheet(
+      context: context,
+      builder: (context) => ListView(
+        children: suggestions
+            .map((s) => ListTile(
+                  title: Text(
+                    s['description'] as String? ?? '',
+                    style: AppTypography.bodyMedium.copyWith(color: AppColors.textPrimary),
+                  ),
+                  onTap: () async {
+                    final placeId = s['place_id'] as String?;
+                    if (placeId != null) {
+                      final details = await _fetchPlaceDetails(placeId);
+                      if (!mounted) return;
+                      setState(() {
+                        _selectedGeoPoint = GeoPoint(details['lat']!, details['lng']!);
+                        _selectedLocationLabel = s['description'] as String?;
+                        _locationSearchController.text = _selectedLocationLabel ?? '';
+                        _placeSuggestions = [];
+                      });
+                    }
+                    if (mounted) Navigator.of(context).pop();
+                  },
+                ))
+            .toList(),
+      ),
+    );
+  }
+
+  Future<List<Map<String, dynamic>>> _fetchPlaceSuggestions(String input) async {
+    final uri = Uri.parse(
+        'https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${Uri.encodeQueryComponent(input)}&types=geocode&key=$_placesApiKey');
+    final res = await http.get(uri);
+    if (res.statusCode != 200) return [];
+    final data = json.decode(res.body) as Map<String, dynamic>;
+    final preds = (data['predictions'] as List? ?? []).cast<Map>();
+    return preds.map((e) => Map<String, dynamic>.from(e)).toList();
+  }
+
+  Future<Map<String, double>> _fetchPlaceDetails(String placeId) async {
+    final uri = Uri.parse(
+        'https://maps.googleapis.com/maps/api/place/details/json?place_id=$placeId&fields=geometry&key=$_placesApiKey');
+    final res = await http.get(uri);
+    if (res.statusCode != 200) return {'lat': 0.0, 'lng': 0.0};
+    final data = json.decode(res.body) as Map<String, dynamic>;
+    final loc = (((data['result'] as Map?)?['geometry'] as Map?)?['location'] as Map?) ?? {};
+    return {
+      'lat': (loc['lat'] as num?)?.toDouble() ?? 0.0,
+      'lng': (loc['lng'] as num?)?.toDouble() ?? 0.0,
+    };
   }
 
   void _addPhoto() {
@@ -368,15 +695,80 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
       _isLoading = true;
     });
 
-    // Simulate saving
-    await Future.delayed(const Duration(seconds: 2));
+    try {
+      if (_selectedGeoPoint == null) {
+        throw Exception('Please pick a location');
+      }
+      if (_selectedCategories.isEmpty) {
+        throw Exception('Please select at least one category');
+      }
+      if (_selectedPaymentOptions.isEmpty) {
+        _selectedPaymentOptions = ['cash'];
+      }
+      if (_selectedLanguages.isEmpty) {
+        _selectedLanguages = ['es'];
+      }
+      final authUser = FirebaseAuth.instance.currentUser;
+      if (authUser == null) {
+        throw Exception('No authenticated user');
+      }
 
-    if (mounted) {
+      final hostDocId = (authUser.email ?? '').toLowerCase().isNotEmpty
+          ? (authUser.email ?? '').toLowerCase()
+          : authUser.uid;
+      final hostRef = FirebaseFirestore.instance.collection('users').doc(hostDocId);
+      final hostSnap = await hostRef.get();
+      final hostData = hostSnap.data() ?? <String, dynamic>{};
+
+      final String title = _titleController.text.trim();
+      final String summary = _descriptionController.text.trim();
+      final String department = _departmentController.text.trim();
+      final int duration = int.tryParse(RegExp(r"\d+").stringMatch(_durationController.text) ?? '') ?? 1;
+      final List<String> categories = _selectedCategories.map((c) => c.toLowerCase()).toList();
+      final List<String> skillsToTeach = _skillsToTeachController.text
+          .split(',')
+          .map((s) => s.trim())
+          .where((s) => s.isNotEmpty)
+          .toList();
+      final List<String> skillsToLearn = _skillsToLearnController.text
+          .split(',')
+          .map((s) => s.trim())
+          .where((s) => s.isNotEmpty)
+          .toList();
+      final int price = int.tryParse(_priceController.text.trim()) ?? 0;
+      final int groupSizeMax = int.tryParse(_groupSizeController.text.trim()) ?? 8;
+
+      final Map<String, dynamic> experience = {
+        'title': title,
+        'summary': summary,
+        'categories': categories,
+        'department': department,
+        'duration': duration,
+        'hostId': hostRef,
+        'hostVerified': (hostData['isVerified'] ?? false) as bool,
+        'avgRating': 0,
+        'reviewsCount': 0,
+        'groupSizeMax': groupSizeMax,
+        'priceCOP': price,
+        'paymentOptions': _selectedPaymentOptions,
+        'languages': _selectedLanguages,
+        'images': _imageUrls,
+        'isActive': true,
+        'location': _selectedGeoPoint,
+        'skillsToTeach': skillsToTeach.isEmpty ? <String>[_skillsToTeachController.text.trim()].where((e) => e.isNotEmpty).toList() : skillsToTeach,
+        'skillsToLearn': skillsToLearn.isEmpty ? <String>[_skillsToLearnController.text.trim()].where((e) => e.isNotEmpty).toList() : skillsToLearn,
+        'createdAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      };
+
+      await FirebaseFirestore.instance.collection('experiences').add(experience);
+
+      if (!mounted) return;
+
       setState(() {
         _isLoading = false;
       });
 
-      // Show success message
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -388,17 +780,38 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
         ),
       );
 
-      // Clear form
       _formKey.currentState!.reset();
       _titleController.clear();
       _descriptionController.clear();
       _durationController.clear();
-      _locationController.clear();
+      _departmentController.clear();
+      _priceController.clear();
+      _groupSizeController.clear();
+      _locationSearchController.clear();
       _skillsToTeachController.clear();
       _skillsToLearnController.clear();
       setState(() {
-        _selectedCategory = null;
+        _selectedCategories = [];
+        _selectedLanguages = [];
+        _selectedPaymentOptions = [];
+        _imageUrls.clear();
+        _selectedGeoPoint = null;
+        _selectedLocationLabel = null;
       });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Failed to create experience: $e',
+            style: AppTypography.bodyMedium.copyWith(color: AppColors.white),
+          ),
+          backgroundColor: AppColors.lava,
+        ),
+      );
     }
   }
 }
