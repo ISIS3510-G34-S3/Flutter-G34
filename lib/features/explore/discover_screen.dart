@@ -186,13 +186,13 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
 
               const SizedBox(width: 12),
 
-              // Map view button
+              // Travel Agent button
               Expanded(
                 child: OutlinedButton.icon(
-                  onPressed: _navigateToMap,
-                  icon: const Icon(Icons.map_outlined),
+                  onPressed: _navigateToChatbot,
+                  icon: const Icon(Icons.support_agent),
                   label: Text(
-                    'Map View',
+                    'Travel Agent',
                     style: AppTypography.buttonMedium,
                   ),
                   style: OutlinedButton.styleFrom(
@@ -424,8 +424,8 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     });
   }
 
-  void _navigateToMap() {
-    context.go('/map');
+  void _navigateToChatbot() {
+    context.push('/chatbot');
   }
 
   void _navigateToExperience(String experienceId) {
