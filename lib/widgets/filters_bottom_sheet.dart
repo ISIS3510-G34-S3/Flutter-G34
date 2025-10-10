@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../theme/colors.dart';
 import '../theme/typography.dart';
-import '../mock/mock_data.dart';
+import '../models/experience.dart';
 
 /// Filters bottom sheet for the discover screen
 class FiltersBottomSheet extends StatefulWidget {
@@ -13,6 +13,7 @@ class FiltersBottomSheet extends StatefulWidget {
     required this.minPrice,
     required this.maxPrice,
     required this.onApplyFilters,
+    required this.allExperiences,
   });
 
   final List<String> selectedCategories;
@@ -20,10 +21,29 @@ class FiltersBottomSheet extends StatefulWidget {
   final List<String> selectedLanguages;
   final double minPrice;
   final double maxPrice;
-  final Function(List<String> categories, List<String> regions, List<String> languages, double minPrice, double maxPrice) onApplyFilters;
+  final Function(List<String> categories, List<String> regions,
+      List<String> languages, double minPrice, double maxPrice) onApplyFilters;
+  final List<Experience> allExperiences;
 
   @override
   State<FiltersBottomSheet> createState() => _FiltersBottomSheetState();
+}
+
+/// Helper function to convert language codes to display names
+String _getLanguageDisplayName(String langCode) {
+  final languageMap = {
+    'en': 'English',
+    'es': 'Español',
+    'pt': 'Português',
+    'fr': 'Français',
+    'de': 'Deutsch',
+    'it': 'Italiano',
+    'zh': '中文',
+    'ja': '日本語',
+    'ko': '한국어',
+    'ru': 'Русский',
+  };
+  return languageMap[langCode.toLowerCase()] ?? langCode;
 }
 
 class _FiltersBottomSheetState extends State<FiltersBottomSheet> {
@@ -31,7 +51,13 @@ class _FiltersBottomSheetState extends State<FiltersBottomSheet> {
   late List<String> _selectedRegions;
   late List<String> _selectedLanguages;
   double _maxPrice = 100.0;
-  bool _sustainabilityOnly = false;
+
+  // Dynamic filter options extracted from actual data
+  List<String> _availableCategories = [];
+  List<String> _availableRegions = [];
+  List<String> _availableLanguages = [];
+  double _minPriceInData = 0;
+  double _maxPriceInData = 200.0;
 
   @override
   void initState() {
@@ -40,6 +66,51 @@ class _FiltersBottomSheetState extends State<FiltersBottomSheet> {
     _selectedRegions = List.from(widget.selectedRegions);
     _selectedLanguages = List.from(widget.selectedLanguages);
     _maxPrice = widget.maxPrice > 0 ? widget.maxPrice : 100.0;
+    _extractFilterOptions();
+  }
+
+  /// Extract available filter options from the actual experiences data
+  void _extractFilterOptions() {
+    if (widget.allExperiences.isEmpty) return;
+
+    // Extract unique categories
+    final categoriesSet = <String>{};
+    for (var exp in widget.allExperiences) {
+      categoriesSet.addAll(exp.categories);
+    }
+    _availableCategories = categoriesSet.toList()..sort();
+
+    // Extract unique regions (departments)
+    final regionsSet = <String>{};
+    for (var exp in widget.allExperiences) {
+      if (exp.department.isNotEmpty) {
+        regionsSet.add(exp.department);
+      }
+    }
+    _availableRegions = regionsSet.toList()..sort();
+
+    // Extract unique languages
+    final languagesSet = <String>{};
+    for (var exp in widget.allExperiences) {
+      languagesSet.addAll(exp.languages);
+    }
+    _availableLanguages = languagesSet.toList()..sort();
+
+    // Calculate price range from data
+    final prices =
+        widget.allExperiences.map((e) => e.priceCOP.toDouble()).toList();
+    if (prices.isNotEmpty) {
+      _minPriceInData = prices.reduce((a, b) => a < b ? a : b);
+      _maxPriceInData = prices.reduce((a, b) => a > b ? a : b);
+
+      // Round max price to nearest 50000
+      _maxPriceInData = ((_maxPriceInData / 50000).ceil() * 50000).toDouble();
+
+      // Update initial max price if it was default
+      if (_maxPrice == 100.0) {
+        _maxPrice = _maxPriceInData;
+      }
+    }
   }
 
   @override
@@ -102,28 +173,32 @@ class _FiltersBottomSheetState extends State<FiltersBottomSheet> {
                   padding: const EdgeInsets.all(16),
                   children: [
                     // Regions
-                    _buildSection(
-                      'Region',
-                      _buildChipsList(
-                        MockData.regions,
-                        _selectedRegions,
-                        (region) => _toggleRegion(region),
+                    if (_availableRegions.isNotEmpty)
+                      _buildSection(
+                        'Region',
+                        _buildChipsList(
+                          _availableRegions,
+                          _selectedRegions,
+                          (region) => _toggleRegion(region),
+                        ),
                       ),
-                    ),
 
-                    const SizedBox(height: 24),
+                    if (_availableRegions.isNotEmpty)
+                      const SizedBox(height: 24),
 
                     // Categories
-                    _buildSection(
-                      'Category',
-                      _buildChipsList(
-                        MockData.categories,
-                        _selectedCategories,
-                        (category) => _toggleCategory(category),
+                    if (_availableCategories.isNotEmpty)
+                      _buildSection(
+                        'Category',
+                        _buildChipsList(
+                          _availableCategories,
+                          _selectedCategories,
+                          (category) => _toggleCategory(category),
+                        ),
                       ),
-                    ),
 
-                    const SizedBox(height: 24),
+                    if (_availableCategories.isNotEmpty)
+                      const SizedBox(height: 24),
 
                     // Price range
                     _buildSection(
@@ -134,18 +209,11 @@ class _FiltersBottomSheetState extends State<FiltersBottomSheet> {
                     const SizedBox(height: 24),
 
                     // Languages
-                    _buildSection(
-                      'Languages',
-                      _buildLanguageCheckboxes(),
-                    ),
-
-                    const SizedBox(height: 24),
-
-                    // Sustainability
-                    _buildSection(
-                      'Sustainability',
-                      _buildSustainabilityToggle(),
-                    ),
+                    if (_availableLanguages.isNotEmpty)
+                      _buildSection(
+                        'Languages',
+                        _buildLanguageCheckboxes(),
+                      ),
 
                     const SizedBox(height: 32),
                   ],
@@ -246,20 +314,20 @@ class _FiltersBottomSheetState extends State<FiltersBottomSheet> {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(
-              '\$0',
+              '\$${_formatPrice(_minPriceInData)}',
               style: AppTypography.bodyMedium.copyWith(
                 color: AppColors.textSecondary,
               ),
             ),
             Text(
-              '\$${_maxPrice.round()}',
+              '\$${_formatPrice(_maxPrice)}',
               style: AppTypography.bodyMedium.copyWith(
                 color: AppColors.forestGreen,
                 fontWeight: FontWeight.w600,
               ),
             ),
             Text(
-              '\$200+',
+              '\$${_formatPrice(_maxPriceInData)}',
               style: AppTypography.bodyMedium.copyWith(
                 color: AppColors.textSecondary,
               ),
@@ -268,10 +336,12 @@ class _FiltersBottomSheetState extends State<FiltersBottomSheet> {
         ),
         const SizedBox(height: 8),
         Slider(
-          value: _maxPrice,
-          min: 0,
-          max: 200,
-          divisions: 20,
+          value: _maxPrice.clamp(_minPriceInData, _maxPriceInData),
+          min: _minPriceInData,
+          max: _maxPriceInData,
+          divisions: ((_maxPriceInData - _minPriceInData) / 10000)
+              .round()
+              .clamp(1, 100),
           onChanged: (value) {
             setState(() {
               _maxPrice = value;
@@ -282,10 +352,30 @@ class _FiltersBottomSheetState extends State<FiltersBottomSheet> {
     );
   }
 
+  /// Format price for display (e.g., 150000 -> 150K)
+  String _formatPrice(double price) {
+    if (price >= 1000000) {
+      return '${(price / 1000000).toStringAsFixed(1)}M';
+    } else if (price >= 1000) {
+      return '${(price / 1000).toStringAsFixed(0)}K';
+    }
+    return price.toStringAsFixed(0);
+  }
+
   Widget _buildLanguageCheckboxes() {
+    if (_availableLanguages.isEmpty) {
+      return Text(
+        'No languages available',
+        style: AppTypography.bodyMedium.copyWith(
+          color: AppColors.textSecondary,
+        ),
+      );
+    }
+
     return Column(
-      children: MockData.availableLanguages.map((language) {
+      children: _availableLanguages.map((language) {
         final isSelected = _selectedLanguages.contains(language);
+        final displayName = _getLanguageDisplayName(language);
         return CheckboxListTile(
           value: isSelected,
           onChanged: (value) {
@@ -298,35 +388,15 @@ class _FiltersBottomSheetState extends State<FiltersBottomSheet> {
             });
           },
           title: Text(
-            language,
-            style: AppTypography.bodyMedium,
+            displayName,
+            style: AppTypography.bodyMedium.copyWith(
+              color: AppColors.textPrimary,
+            ),
           ),
           controlAffinity: ListTileControlAffinity.leading,
           contentPadding: EdgeInsets.zero,
         );
       }).toList(),
-    );
-  }
-
-  Widget _buildSustainabilityToggle() {
-    return SwitchListTile(
-      value: _sustainabilityOnly,
-      onChanged: (value) {
-        setState(() {
-          _sustainabilityOnly = value;
-        });
-      },
-      title: Text(
-        'Sustainable experiences only',
-        style: AppTypography.bodyMedium,
-      ),
-      subtitle: Text(
-        'Show only eco-friendly and culturally responsible experiences',
-        style: AppTypography.bodySmall.copyWith(
-          color: AppColors.textSecondary,
-        ),
-      ),
-      contentPadding: EdgeInsets.zero,
     );
   }
 
@@ -355,13 +425,13 @@ class _FiltersBottomSheetState extends State<FiltersBottomSheet> {
       _selectedCategories.clear();
       _selectedRegions.clear();
       _selectedLanguages.clear();
-      _maxPrice = 100.0;
-      _sustainabilityOnly = false;
+      _maxPrice = _maxPriceInData;
     });
   }
 
   void _applyFilters() {
-    widget.onApplyFilters(_selectedCategories, _selectedRegions, _selectedLanguages, 0.0, _maxPrice);
+    widget.onApplyFilters(_selectedCategories, _selectedRegions,
+        _selectedLanguages, 0.0, _maxPrice);
     Navigator.of(context).pop();
 
     // Show feedback
