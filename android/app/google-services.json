@@ -51,6 +51,14 @@
           }
         },
         {
+          "client_id": "994400477277-7v7cg8d6orj6hi4f0mqn6vt5t0c7piog.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.travel_connect",
+            "certificate_hash": "df26ca9053948b5cbd6b67a8a5eca8c1f1d06cca"
+          }
+        },
+        {
           "client_id": "994400477277-ropltmpc3ec8ovelbgac7feice2d5qct.apps.googleusercontent.com",
           "client_type": 3
         }
