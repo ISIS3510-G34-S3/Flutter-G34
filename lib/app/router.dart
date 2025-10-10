@@ -10,6 +10,7 @@ import '../features/create/create_experience_screen.dart';
 import '../features/profile/profile_screen.dart';
 import '../features/profile/profie_verification_screen.dart';
 import '../features/messaging/messaging_screen.dart';
+import '../features/chatbot/chatbot_screen.dart';
 import '../widgets/main_scaffold.dart';
 
 /// Main router configuration for the app
@@ -102,6 +103,13 @@ final GoRouter appRouter = GoRouter(
         final hostId = state.pathParameters['hostId']!;
         return MessagingScreen(hostId: hostId);
       },
+    ),
+
+    // Chatbot route (standalone)
+    GoRoute(
+      path: '/chatbot',
+      name: 'chatbot',
+      builder: (context, state) => const ChatbotScreen(),
     ),
   ],
   errorBuilder: (context, state) => Scaffold(
