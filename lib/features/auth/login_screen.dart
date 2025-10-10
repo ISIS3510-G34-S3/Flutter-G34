@@ -337,8 +337,11 @@ class _LoginScreenState extends State<LoginScreen> {
       final user = credential.user;
 
       if (user != null) {
-        // Upsert user document in Firestore
-        final docRef = FirebaseFirestore.instance.collection('users').doc(user.uid);
+        // Upsert user document in Firestore using email as ID
+        final emailId = (user.email ?? '').toLowerCase();
+        final docRef = FirebaseFirestore.instance
+            .collection('users')
+            .doc(emailId.isNotEmpty ? emailId : user.uid);
         await docRef.set({
           'uid': user.uid,
           'email': user.email,
@@ -412,8 +415,12 @@ class _LoginScreenState extends State<LoginScreen> {
       final user = userCred.user;
 
       if (user != null) {
-        // Upsert Firestore user
-        await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+        // Upsert Firestore user using email as ID
+        final emailId = (user.email ?? '').toLowerCase();
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(emailId.isNotEmpty ? emailId : user.uid)
+            .set({
           'uid': user.uid,
           'email': user.email,
           'displayName': user.displayName,

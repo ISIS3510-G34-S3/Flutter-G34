@@ -474,8 +474,11 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
         // Optionally update display name
         await user.updateDisplayName(name);
 
-        // Create user doc in Firestore
-        await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+        // Create user doc in Firestore using email as ID
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(email.toLowerCase())
+            .set({
           'uid': user.uid,
           'email': email,
           'displayName': name,
@@ -549,7 +552,11 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
       final userCred = await FirebaseAuth.instance.signInWithCredential(credential);
       final user = userCred.user;
       if (user != null) {
-        await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+        final emailId = (user.email ?? '').toLowerCase();
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(emailId.isNotEmpty ? emailId : user.uid)
+            .set({
           'uid': user.uid,
           'email': user.email,
           'displayName': user.displayName,
