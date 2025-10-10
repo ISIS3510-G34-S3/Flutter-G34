@@ -312,9 +312,8 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     // Filter by price range
     if (_minPrice > 0 || _maxPrice < double.infinity) {
       experiences = experiences
-          .where((exp) => 
-              exp.priceCOP >= _minPrice && 
-              exp.priceCOP <= _maxPrice)
+          .where(
+              (exp) => exp.priceCOP >= _minPrice && exp.priceCOP <= _maxPrice)
           .toList();
     }
 
@@ -393,6 +392,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
         selectedLanguages: _selectedLanguages,
         minPrice: _minPrice,
         maxPrice: _maxPrice == double.infinity ? 0 : _maxPrice,
+        allExperiences: _allExperiences,
         onApplyFilters: (categories, regions, languages, minPrice, maxPrice) {
           setState(() {
             _selectedCategories = categories;
