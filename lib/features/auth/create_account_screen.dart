@@ -8,6 +8,7 @@ import 'package:flutter/services.dart' as services;
 import 'package:flutter/foundation.dart' show kIsWeb;
 import '../../theme/colors.dart';
 import '../../theme/typography.dart';
+import 'app_regex.dart';
 
 /// Create account screen with user type selection and form fields
 class CreateAccountScreen extends StatefulWidget {
@@ -255,7 +256,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
             }
             // Only letters (unicode), spaces, and apostrophe allowed
             final name = value.trim();
-            final validName = RegExp(r"^[\p{L} ']+$", unicode: true).hasMatch(name);
+            final validName = AppRegex.nameRegex.hasMatch(name);
             if (!validName) {
               return "Only letters, spaces, and ' are allowed";
             }
@@ -319,8 +320,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
             final email = value.trim();
             // Allowed: letters, digits, @, ., _, -
             // Disallow: non-ASCII, spaces, other specials, consecutive dots, leading/trailing dots
-            final emailPattern = RegExp(r'^(?!.*\.{2})[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)*@[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)*\.[A-Za-z]{2,}$');
-            if (!emailPattern.hasMatch(email)) return 'Please enter a valid email address';
+            if (!AppRegex.emailRegex.hasMatch(email)) return 'Please enter a valid email address';
             return null;
           },
         ),
@@ -373,9 +373,33 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
             if (value == null || value.isEmpty) {
               return 'Please enter a password';
             }
-            if (value.length < 6) {
-              return 'Password must be at least 6 characters';
+            
+            if (value.length < 8) {
+              return 'Password must be at least 8 characters';
             }
+            
+            // Check if password matches the main password regex
+            if (!AppRegex.passwordRegex.hasMatch(value)) {
+              // Password is invalid, now check for specific issues
+              
+              // Check for spaces
+              if (AppRegex.passwordHasSpace.hasMatch(value)) {
+                return 'Password cannot contain spaces';
+              }
+              
+              // Check for emojis
+              if (AppRegex.passwordHasEmoji.hasMatch(value)) {
+                return 'Password cannot contain emojis';
+              }
+              
+              // Check for invalid characters
+              if (AppRegex.passwordHasInvalidChar.hasMatch(value)) {
+                return 'Password can only contain letters, digits, and @\$#!%?&_';
+              }
+              // Generic fallback
+              return 'Password does not meet requirements';
+            }
+            
             return null;
           },
         ),
