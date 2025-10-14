@@ -7,6 +7,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'dart:async';
+import 'dart:io';
+import 'package:image_picker/image_picker.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 
 /// Create experience screen with form for adding new experiences
 class CreateExperienceScreen extends StatefulWidget {
@@ -32,6 +35,7 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
   List<String> _selectedLanguages = [];
   List<String> _selectedPaymentOptions = [];
   final List<String> _imageUrls = [];
+  final List<File> _localPhotos = [];
   GeoPoint? _selectedGeoPoint;
   String? _selectedLocationLabel;
   bool _isLoading = false;
@@ -287,20 +291,26 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
           ),
         ),
         const SizedBox(height: 12),
-        Row(
-          children: [
-            // First photo placeholder
-            Expanded(
-              child: _buildPhotoPlaceholder('Add Photo'),
-            ),
-
-            const SizedBox(width: 16),
-
-            // Second photo placeholder
-            Expanded(
-              child: _buildPhotoPlaceholder('Add Photo'),
-            ),
-          ],
+        SizedBox(
+          height: 120,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemBuilder: (context, index) {
+              if (index < _localPhotos.length) {
+                final file = _localPhotos[index];
+                return AspectRatio(
+                  aspectRatio: 1,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: Image.file(file, fit: BoxFit.cover),
+                  ),
+                );
+              }
+              return _buildPhotoPlaceholder('Add Photo');
+            },
+            separatorBuilder: (_, __) => const SizedBox(width: 16),
+            itemCount: (_localPhotos.length + 1).clamp(1, 8),
+          ),
         ),
       ],
     );
@@ -675,15 +685,45 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
   }
 
   void _addPhoto() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          'Photo upload coming soon!',
-          style: AppTypography.bodyMedium.copyWith(color: AppColors.white),
+    _pickAndUploadFromCamera();
+  }
+
+  Future<void> _pickAndUploadFromCamera() async {
+    try {
+      final ImagePicker picker = ImagePicker();
+      final XFile? captured = await picker.pickImage(source: ImageSource.camera, preferredCameraDevice: CameraDevice.rear, imageQuality: 85);
+      if (captured == null) return;
+
+      // Upload to Firebase Storage under user ID folder
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        throw Exception('No authenticated user');
+      }
+      final String uid = user.uid;
+      final String fileName = 'photo_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      final File file = File(captured.path);
+
+      final storage = FirebaseStorage.instanceFor(
+        bucket: 'gs://travelappbd-8e204.firebasestorage.app',
+      );
+      final ref = storage.ref().child('experiences/$uid/$fileName');
+      final uploadTask = await ref.putFile(file, SettableMetadata(contentType: 'image/jpeg'));
+      final String downloadUrl = await uploadTask.ref.getDownloadURL();
+
+      if (!mounted) return;
+      setState(() {
+        _localPhotos.add(file);
+        _imageUrls.add(downloadUrl);
+      });
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to capture photo: $e'),
+          backgroundColor: AppColors.lava,
         ),
-        backgroundColor: AppColors.forestGreen,
-      ),
-    );
+      );
+    }
   }
 
   void _saveExperience() async {

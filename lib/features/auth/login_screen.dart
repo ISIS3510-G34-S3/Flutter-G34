@@ -415,19 +415,39 @@ class _LoginScreenState extends State<LoginScreen> {
       final user = userCred.user;
 
       if (user != null) {
-        // Upsert Firestore user using email as ID
+        // Check if Firestore user exists (email preferred as ID)
         final emailId = (user.email ?? '').toLowerCase();
-        await FirebaseFirestore.instance
+        final docRef = FirebaseFirestore.instance
             .collection('users')
-            .doc(emailId.isNotEmpty ? emailId : user.uid)
-            .set({
+            .doc(emailId.isNotEmpty ? emailId : user.uid);
+        final snapshot = await docRef.get();
+
+        if (!snapshot.exists) {
+          // Cancel login if user hasn't created an account via Google yet
+          await FirebaseAuth.instance.signOut();
+          try {
+            await googleSignIn.signOut();
+          } catch (_) {}
+
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Create the account with Google first before logging in with Google.'),
+              backgroundColor: AppColors.lava,
+            ),
+          );
+          return;
+        }
+
+        // User exists → update metadata and continue
+        await docRef.update({
           'uid': user.uid,
           'email': user.email,
           'displayName': user.displayName,
           'photoURL': user.photoURL,
           'provider': 'google',
           'lastSignInAt': FieldValue.serverTimestamp(),
-        }, SetOptions(merge: true));
+        });
 
         if (!mounted) return;
         context.go('/discover');
