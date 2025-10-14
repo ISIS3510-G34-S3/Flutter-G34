@@ -32,9 +32,9 @@ class MainScaffold extends StatelessWidget {
             label: 'Map',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.add_circle_outline),
-            activeIcon: Icon(Icons.add_circle),
-            label: 'Create',
+            icon: Icon(Icons.explore_outlined),
+            activeIcon: Icon(Icons.explore),
+            label: 'My Experiences',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.person_outline),
@@ -49,7 +49,7 @@ class MainScaffold extends StatelessWidget {
   int _calculateSelectedIndex(String location) {
     if (location.startsWith('/discover')) return 0;
     if (location.startsWith('/map')) return 1;
-    if (location.startsWith('/create')) return 2;
+    if (location.startsWith('/my-experiences')) return 2;
     if (location.startsWith('/profile')) return 3;
     return 0; // Default to home
   }
@@ -63,7 +63,7 @@ class MainScaffold extends StatelessWidget {
         context.go('/map');
         break;
       case 2:
-        context.go('/create');
+        context.go('/my-experiences');
         break;
       case 3:
         context.go('/profile/current');

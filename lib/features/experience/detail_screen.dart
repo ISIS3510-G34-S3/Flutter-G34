@@ -107,7 +107,7 @@ class _ExperienceDetailScreenState extends State<ExperienceDetailScreen> {
       backgroundColor: AppColors.forestGreen,
       leading: IconButton(
         icon: const Icon(Icons.arrow_back, color: AppColors.white),
-        onPressed: () => Navigator.of(context).pop(),
+        onPressed: () => context.pop(),
       ),
       flexibleSpace: FlexibleSpaceBar(
         background: Stack(
@@ -226,12 +226,7 @@ class _ExperienceDetailScreenState extends State<ExperienceDetailScreen> {
     );
   }
 
-  Widget _buildHostSection(Experience experience) {
-    // This section is commented out as host data is not directly available
-    // in the experience model. You would need to fetch host data separately
-    // using the hostId from the experience.
-    return const SizedBox.shrink();
-  }
+  // Removed unused host section
 
   Widget _buildAboutSection(Experience experience) {
     return Padding(

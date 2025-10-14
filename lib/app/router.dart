@@ -12,6 +12,8 @@ import '../features/profile/profie_verification_screen.dart';
 import '../features/messaging/messaging_screen.dart';
 import '../features/chatbot/chatbot_screen.dart';
 import '../widgets/main_scaffold.dart';
+import '../features/experience/my_experiences_screen.dart';
+import '../features/experience/edit_experience_screen.dart';
 
 /// Main router configuration for the app
 final GoRouter appRouter = GoRouter(
@@ -56,6 +58,13 @@ final GoRouter appRouter = GoRouter(
           builder: (context, state) => const CreateExperienceScreen(),
         ),
 
+        // My Experiences route
+        GoRoute(
+          path: '/my-experiences',
+          name: 'my-experiences',
+          builder: (context, state) => const MyExperiencesScreen(),
+        ),
+
         // Profile route
         GoRoute(
           path: '/profile/:id',
@@ -75,6 +84,16 @@ final GoRouter appRouter = GoRouter(
       builder: (context, state) {
         final experienceId = state.pathParameters['id']!;
         return ExperienceDetailScreen(experienceId: experienceId);
+      },
+    ),
+
+    // Edit experience route (standalone)
+    GoRoute(
+      path: '/experience/:id/edit',
+      name: 'experience-edit',
+      builder: (context, state) {
+        final experienceId = state.pathParameters['id']!;
+        return EditExperienceScreen(experienceId: experienceId);
       },
     ),
 
