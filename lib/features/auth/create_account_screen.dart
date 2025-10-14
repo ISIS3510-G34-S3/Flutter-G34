@@ -373,11 +373,10 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
             if (value == null || value.isEmpty) {
               return 'Please enter a password';
             }
-            
+
             if (value.length < 8) {
               return 'Password must be at least 8 characters';
             }
-            
             // Check if password matches the main password regex
             if (!AppRegex.passwordRegex.hasMatch(value)) {
               // Password is invalid, now check for specific issues
@@ -394,8 +393,22 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
               
               // Check for invalid characters
               if (AppRegex.passwordHasInvalidChar.hasMatch(value)) {
-                return 'Password can only contain letters, digits, and @\$#!%?&_';
+                return 'Password can only contain letters, digits, and @\$#!%?&_*';
               }
+              
+              // Check for missing requirements
+              if (!AppRegex.passwordHasLowercase.hasMatch(value)) {
+                return 'Password must contain at least one lowercase letter';
+              }
+              
+              if (!AppRegex.passwordHasUppercase.hasMatch(value)) {
+                return 'Password must contain at least one uppercase letter';
+              }
+              
+              if (!AppRegex.passwordHasDigit.hasMatch(value)) {
+                return 'Password must contain at least one digit';
+              }
+              
               // Generic fallback
               return 'Password does not meet requirements';
             }

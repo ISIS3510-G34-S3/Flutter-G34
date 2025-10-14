@@ -64,7 +64,12 @@ class ChatbotService {
       request.headers['authorization'] = 'Bearer $_apiKey';
       request.body = requestBody;
 
-      final streamedResponse = await request.send();
+      final streamedResponse = await request.send().timeout(
+        const Duration(seconds: 30),
+        onTimeout: () {
+          throw Exception('Connection timeout - Please check your internet connection');
+        },
+      );
       final response = await http.Response.fromStream(streamedResponse);
 
       if (response.statusCode == 200) {
@@ -76,12 +81,24 @@ class ChatbotService {
       } else {
         print('API Error: ${response.statusCode} - ${response.body}');
         return ChatbotResponse(
-          text: 'Sorry, I encountered an error. Please try again.',
+          text: 'Sorry, I encountered an error. Please try again. (Error ${response.statusCode})',
           recommendations: [],
         );
       }
-    } catch (e) {
+    } on http.ClientException catch (e) {
+      print('Network Error: $e');
+      print('This usually means:');
+      print('1. No internet connection');
+      print('2. API endpoint is blocked or unreachable');
+      print('3. SSL/Certificate issues');
+      return ChatbotResponse(
+        text:
+            'Unable to connect to the server. Please check your internet connection and try again.',
+        recommendations: [],
+      );
+    } catch (e, stackTrace) {
       print('Error in chatbot service: $e');
+      print('Stack trace: $stackTrace');
       return ChatbotResponse(
         text:
             'Sorry, I encountered an error processing your request. Please try again.',
