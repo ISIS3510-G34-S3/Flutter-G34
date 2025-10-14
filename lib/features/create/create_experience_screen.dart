@@ -7,6 +7,10 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'dart:async';
+import 'dart:io';
+import 'package:image_picker/image_picker.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:flutter/services.dart' as services;
 
 /// Create experience screen with form for adding new experiences
 class CreateExperienceScreen extends StatefulWidget {
@@ -21,7 +25,6 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
   final _titleController = TextEditingController();
   final _descriptionController = TextEditingController();
   final _durationController = TextEditingController();
-  final _departmentController = TextEditingController();
   final _priceController = TextEditingController();
   final _groupSizeController = TextEditingController();
   final _locationSearchController = TextEditingController();
@@ -32,8 +35,10 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
   List<String> _selectedLanguages = [];
   List<String> _selectedPaymentOptions = [];
   final List<String> _imageUrls = [];
+  final List<File> _localPhotos = [];
   GeoPoint? _selectedGeoPoint;
   String? _selectedLocationLabel;
+  String? _selectedDepartment;
   bool _isLoading = false;
 
   static const List<String> _languageOptions = ['es', 'en', 'pt', 'fr'];
@@ -50,7 +55,6 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
     _titleController.dispose();
     _descriptionController.dispose();
     _durationController.dispose();
-    _departmentController.dispose();
     _priceController.dispose();
     _groupSizeController.dispose();
     _locationSearchController.dispose();
@@ -60,6 +64,110 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
     super.dispose();
   }
 
+  Widget _buildDurationField() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Duration (hours)',
+          style: AppTypography.labelLarge.copyWith(
+            color: AppColors.textPrimary,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            IconButton(
+              onPressed: () {
+                final v = int.tryParse(_durationController.text.trim()) ?? 0;
+                final next = v - 1;
+                _durationController.text = (next < 0 ? 0 : next).toString();
+                setState(() {});
+              },
+              icon: const Icon(Icons.remove_circle_outline),
+            ),
+            Expanded(
+              child: TextFormField(
+                controller: _durationController,
+                keyboardType: TextInputType.number,
+                inputFormatters: [
+                  services.FilteringTextInputFormatter.allow(RegExp(r'[0-9]')),
+                ],
+                decoration: const InputDecoration(
+                  hintText: 'e.g. 3 (hours)',
+                ),
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return 'Please enter duration in hours';
+                  }
+                  if (!RegExp(r'^\d+$').hasMatch(value.trim())) {
+                    return 'Enter a valid non-negative integer';
+                  }
+                  return null;
+                },
+              ),
+            ),
+            IconButton(
+              onPressed: () {
+                final v = int.tryParse(_durationController.text.trim()) ?? 0;
+                _durationController.text = (v + 1).toString();
+                setState(() {});
+              },
+              icon: const Icon(Icons.add_circle_outline),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildNumericField({
+    required String label,
+    required TextEditingController controller,
+    required String hint,
+    required bool allowNegative,
+    required String validatorMessage,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: AppTypography.labelLarge.copyWith(
+            color: AppColors.textPrimary,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 8),
+        TextFormField(
+          controller: controller,
+          keyboardType: TextInputType.number,
+          inputFormatters: [
+            services.FilteringTextInputFormatter.allow(
+              allowNegative ? RegExp(r'[-0-9]') : RegExp(r'[0-9]'),
+            ),
+          ],
+          decoration: InputDecoration(
+            hintText: hint,
+          ),
+          validator: (value) {
+            if (value == null || value.trim().isEmpty) {
+              return validatorMessage;
+            }
+            final ok = allowNegative
+                ? RegExp(r'^-?\d+$').hasMatch(value.trim())
+                : RegExp(r'^\d+$').hasMatch(value.trim());
+            if (!ok) return validatorMessage;
+            if (!allowNegative && int.tryParse(value.trim())! < 0) {
+              return validatorMessage;
+            }
+            return null;
+          },
+        ),
+      ],
+    );
+  }
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -132,62 +240,31 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
 
             const SizedBox(height: 20),
 
-            // Duration field (hours or days number)
-            _buildTextField(
-              label: 'Duration',
-              controller: _durationController,
-              hint: '3 (hours/days)',
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'Please enter duration';
-                }
-                return null;
-              },
-            ),
+            // Duration (hours, non-negative)
+            _buildDurationField(),
 
             const SizedBox(height: 20),
 
-            // Department
-            _buildTextField(
-              label: 'Department',
-              controller: _departmentController,
-              hint: 'e.g. Tolima',
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'Please enter a department';
-                }
-                return null;
-              },
-            ),
+            // Department is auto-filled from location
 
-            const SizedBox(height: 20),
-
-            // Price COP
-            _buildTextField(
+            // Price (COP, non-negative)
+            _buildNumericField(
               label: 'Price (COP)',
               controller: _priceController,
               hint: 'e.g. 120000',
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'Please enter a price';
-                }
-                return null;
-              },
+              allowNegative: false,
+              validatorMessage: 'Please enter a valid non-negative price',
             ),
 
             const SizedBox(height: 20),
 
-            // Group size
-            _buildTextField(
+            // Group size (non-negative)
+            _buildNumericField(
               label: 'Max Group Size',
               controller: _groupSizeController,
               hint: 'e.g. 8',
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'Please enter max group size';
-                }
-                return null;
-              },
+              allowNegative: false,
+              validatorMessage: 'Please enter a valid non-negative group size',
             ),
 
             const SizedBox(height: 20),
@@ -266,9 +343,6 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
 
             const SizedBox(height: 20),
 
-            // Image URLs
-            _buildImagesInput(),
-
             const SizedBox(height: 32),
           ],
         ),
@@ -287,20 +361,26 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
           ),
         ),
         const SizedBox(height: 12),
-        Row(
-          children: [
-            // First photo placeholder
-            Expanded(
-              child: _buildPhotoPlaceholder('Add Photo'),
-            ),
-
-            const SizedBox(width: 16),
-
-            // Second photo placeholder
-            Expanded(
-              child: _buildPhotoPlaceholder('Add Photo'),
-            ),
-          ],
+        SizedBox(
+          height: 120,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemBuilder: (context, index) {
+              if (index < _localPhotos.length) {
+                final file = _localPhotos[index];
+                return AspectRatio(
+                  aspectRatio: 1,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: Image.file(file, fit: BoxFit.cover),
+                  ),
+                );
+              }
+              return _buildPhotoPlaceholder('Add Photo');
+            },
+            separatorBuilder: (_, __) => const SizedBox(width: 16),
+            itemCount: (_localPhotos.length + 1).clamp(1, 8),
+          ),
         ),
       ],
     );
@@ -457,59 +537,7 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
     );
   }
 
-  Widget _buildImagesInput() {
-    final controller = TextEditingController();
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Image URLs',
-          style: AppTypography.labelLarge.copyWith(
-            color: AppColors.textPrimary,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Row(
-          children: [
-            Expanded(
-              child: TextField(
-                controller: controller,
-                decoration: const InputDecoration(hintText: 'https://...'),
-              ),
-            ),
-            const SizedBox(width: 8),
-            ElevatedButton(
-              onPressed: () {
-                final url = controller.text.trim();
-                if (url.isNotEmpty) {
-                  setState(() {
-                    _imageUrls.add(url);
-                  });
-                  controller.clear();
-                }
-              },
-              child: const Text('Add'),
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        Wrap(
-          spacing: 8,
-          children: _imageUrls
-              .map((u) => Chip(
-                    label: Text(u, overflow: TextOverflow.ellipsis),
-                    onDeleted: () {
-                      setState(() {
-                        _imageUrls.remove(u);
-                      });
-                    },
-                  ))
-              .toList(),
-        ),
-      ],
-    );
-  }
+  // removed image URLs manual input; URLs are added automatically after upload
 
   Widget _buildLocationPicker() {
     return Column(
@@ -562,9 +590,10 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
                       final details = await _fetchPlaceDetails(placeId);
                       if (!mounted) return;
                       setState(() {
-                        _selectedGeoPoint = GeoPoint(details['lat']!, details['lng']!);
+                        _selectedGeoPoint = GeoPoint((details['lat'] as num).toDouble(), (details['lng'] as num).toDouble());
                         _selectedLocationLabel = s['description'] as String?;
                         _locationSearchController.text = _selectedLocationLabel ?? '';
+                        _selectedDepartment = details['department'] as String?;
                         _placeSuggestions = [];
                       });
                     }
@@ -661,29 +690,70 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
     return preds.map((e) => Map<String, dynamic>.from(e)).toList();
   }
 
-  Future<Map<String, double>> _fetchPlaceDetails(String placeId) async {
+  Future<Map<String, dynamic>> _fetchPlaceDetails(String placeId) async {
     final uri = Uri.parse(
-        'https://maps.googleapis.com/maps/api/place/details/json?place_id=$placeId&fields=geometry&key=$_placesApiKey');
+        'https://maps.googleapis.com/maps/api/place/details/json?place_id=$placeId&fields=geometry,address_components&key=$_placesApiKey');
     final res = await http.get(uri);
-    if (res.statusCode != 200) return {'lat': 0.0, 'lng': 0.0};
+    if (res.statusCode != 200) return {'lat': 0.0, 'lng': 0.0, 'department': null};
     final data = json.decode(res.body) as Map<String, dynamic>;
-    final loc = (((data['result'] as Map?)?['geometry'] as Map?)?['location'] as Map?) ?? {};
+    final result = (data['result'] as Map?) ?? {};
+    final loc = ((result['geometry'] as Map?)?['location'] as Map?) ?? {};
+    final comps = (result['address_components'] as List?)?.cast<Map>() ?? [];
+    String? admin1;
+    for (final c in comps) {
+      final types = (c['types'] as List?)?.cast<String>() ?? [];
+      if (types.contains('administrative_area_level_1')) {
+        admin1 = c['long_name'] as String?;
+        break;
+      }
+    }
     return {
       'lat': (loc['lat'] as num?)?.toDouble() ?? 0.0,
       'lng': (loc['lng'] as num?)?.toDouble() ?? 0.0,
+      'department': admin1,
     };
   }
 
   void _addPhoto() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          'Photo upload coming soon!',
-          style: AppTypography.bodyMedium.copyWith(color: AppColors.white),
+    _pickAndUploadFromCamera();
+  }
+
+  Future<void> _pickAndUploadFromCamera() async {
+    try {
+      final ImagePicker picker = ImagePicker();
+      final XFile? captured = await picker.pickImage(source: ImageSource.camera, preferredCameraDevice: CameraDevice.rear, imageQuality: 85);
+      if (captured == null) return;
+
+      // Upload to Firebase Storage under user ID folder
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        throw Exception('No authenticated user');
+      }
+      final String uid = user.uid;
+      final String fileName = 'photo_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      final File file = File(captured.path);
+
+      final storage = FirebaseStorage.instanceFor(
+        bucket: 'gs://travelappbd-8e204.firebasestorage.app',
+      );
+      final ref = storage.ref().child('experiences/$uid/$fileName');
+      final uploadTask = await ref.putFile(file, SettableMetadata(contentType: 'image/jpeg'));
+      final String downloadUrl = await uploadTask.ref.getDownloadURL();
+
+      if (!mounted) return;
+      setState(() {
+        _localPhotos.add(file);
+        _imageUrls.add(downloadUrl);
+      });
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to capture photo: $e'),
+          backgroundColor: AppColors.lava,
         ),
-        backgroundColor: AppColors.forestGreen,
-      ),
-    );
+      );
+    }
   }
 
   void _saveExperience() async {
@@ -722,8 +792,8 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
 
       final String title = _titleController.text.trim();
       final String summary = _descriptionController.text.trim();
-      final String department = _departmentController.text.trim();
-      final int duration = int.tryParse(RegExp(r"\d+").stringMatch(_durationController.text) ?? '') ?? 1;
+      final String department = _selectedDepartment ?? '';
+      final int duration = int.tryParse(_durationController.text.trim()) ?? 0;
       final List<String> categories = _selectedCategories.map((c) => c.toLowerCase()).toList();
       final List<String> skillsToTeach = _skillsToTeachController.text
           .split(',')
@@ -736,7 +806,7 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
           .where((s) => s.isNotEmpty)
           .toList();
       final int price = int.tryParse(_priceController.text.trim()) ?? 0;
-      final int groupSizeMax = int.tryParse(_groupSizeController.text.trim()) ?? 8;
+      final int groupSizeMax = int.tryParse(_groupSizeController.text.trim()) ?? 0;
 
       final Map<String, dynamic> experience = {
         'title': title,
@@ -784,7 +854,6 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
       _titleController.clear();
       _descriptionController.clear();
       _durationController.clear();
-      _departmentController.clear();
       _priceController.clear();
       _groupSizeController.clear();
       _locationSearchController.clear();

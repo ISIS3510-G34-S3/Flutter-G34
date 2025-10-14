@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:flutter/services.dart' show PlatformException;
+import 'package:flutter/services.dart' as services;
 import 'package:flutter/foundation.dart' show kIsWeb;
 import '../../theme/colors.dart';
 import '../../theme/typography.dart';
@@ -213,6 +214,12 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
         const SizedBox(height: 8),
         TextFormField(
           controller: _fullNameController,
+          inputFormatters: [
+            // Allow only letters (unicode), spaces and apostrophe
+            services.FilteringTextInputFormatter.allow(
+              RegExp(r"[\p{L} ']+", unicode: true),
+            ),
+          ],
           decoration: InputDecoration(
             hintText: 'Enter your full name',
             hintStyle: AppTypography.bodyMedium.copyWith(
@@ -246,6 +253,12 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
             if (value.trim().length < 2) {
               return 'Name must be at least 2 characters';
             }
+            // Only letters (unicode), spaces, and apostrophe allowed
+            final name = value.trim();
+            final validName = RegExp(r"^[\p{L} ']+$", unicode: true).hasMatch(name);
+            if (!validName) {
+              return "Only letters, spaces, and ' are allowed";
+            }
             return null;
           },
         ),
@@ -268,6 +281,11 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
         TextFormField(
           controller: _emailController,
           keyboardType: TextInputType.emailAddress,
+          inputFormatters: [
+            services.FilteringTextInputFormatter.allow(
+              RegExp(r"[A-Za-z0-9@._-]"),
+            ),
+          ],
           decoration: InputDecoration(
             hintText: 'Enter your email',
             hintStyle: AppTypography.bodyMedium.copyWith(
@@ -298,9 +316,11 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
             if (value == null || value.trim().isEmpty) {
               return 'Please enter your email';
             }
-            if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value.trim())) {
-              return 'Please enter a valid email address';
-            }
+            final email = value.trim();
+            // Allowed: letters, digits, @, ., _, -
+            // Disallow: non-ASCII, spaces, other specials, consecutive dots, leading/trailing dots
+            final emailPattern = RegExp(r'^(?!.*\.{2})[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)*@[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)*\.[A-Za-z]{2,}$');
+            if (!emailPattern.hasMatch(email)) return 'Please enter a valid email address';
             return null;
           },
         ),
@@ -465,6 +485,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
       final email = _emailController.text.trim();
       final password = _passwordController.text.trim();
 
+
       // Create user with Firebase Auth
       final credential = await FirebaseAuth.instance
           .createUserWithEmailAndPassword(email: email, password: password);
@@ -497,9 +518,13 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
       }
     } on FirebaseAuthException catch (e) {
       if (!mounted) return;
+      final String message =
+          e.code == 'email-already-in-use'
+              ? 'Email already in use. If you signed up with Google, use Google Sign-In or reset your password.'
+              : (e.message ?? 'Failed to create account');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(e.message ?? 'Failed to create account'),
+          content: Text(message),
           backgroundColor: AppColors.lava,
         ),
       );
