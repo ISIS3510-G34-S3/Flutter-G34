@@ -265,3 +265,104 @@ This project is developed for educational purposes as part of the Mobile Develop
 ---
 
 For more information about Flutter development, visit the [Flutter documentation](https://docs.flutter.dev/).
+
+## ⚡ Quick facts
+
+- Repository name: `Flutter-G34`
+- Package (pub) name: `travel_connect`
+- Current app version: `1.0.0+1`
+- Dart SDK constraint: `>=3.0.0 <4.0.0`
+- Current branch: `sarenasr` (development branch used in this workspace)
+
+## 🔐 Firebase configuration (project-specific)
+
+This project uses Firebase for core services (Auth, Firestore, Storage). The repository already includes generated Firebase configuration helpers:
+
+- `lib/firebase_options.dart` — generated Firebase options used at app startup (imported by `lib/main.dart`).
+- `android/app/google-services.json` — Android configuration file (the workspace contains a `google-services.json` under the `android/app/` directory).
+- `firebase.json` — FlutterFire helper that maps platforms to project/app IDs.
+
+Firebase identifiers found in this workspace (do not share secrets):
+
+- Firebase projectId: `travelappbd-8e204`
+- Android appId: `1:994400477277:android:d19bd770bd131911a06db4`
+- Web appId: `1:994400477277:web:f8a4170404a96586a06db4`
+
+If you need to set up Firebase locally for development or CI, install and run the Firebase CLI and follow the FlutterFire documentation to regenerate `firebase_options.dart` and download platform config files:
+
+1. Install FlutterFire CLI and Firebase CLI (if needed) and log in.
+2. Run `flutterfire configure` from the project root and follow prompts.
+3. Place the downloaded `google-services.json` in `android/app/` and the `GoogleService-Info.plist` in `ios/Runner` if you target iOS.
+
+Note: `lib/main.dart` initializes Firebase using `DefaultFirebaseOptions.currentPlatform`; keep `firebase_options.dart` checked into the repo for consistent environment settings.
+
+## 🧰 Environment & toolchain
+
+- Required: Flutter SDK (tested with Flutter 3.x+), Dart matching the SDK constraint in `pubspec.yaml`.
+- Android: Android SDK + emulator or device; `local.properties` should point to the Android SDK path for local development.
+- Desktop/web: the project includes web and Windows folders — ensure you have the platform toolchains if you plan to build for those targets.
+
+## 📦 Exact dependency versions (from `pubspec.yaml`)
+
+The app depends on the following notable packages (versions pinned in `pubspec.yaml`):
+
+- go_router: ^13.2.0
+- google_fonts: ^6.1.0
+- flutter_svg: ^2.0.9
+- intl: ^0.19.0
+- google_maps_flutter: ^2.13.1
+- geolocator: ^14.0.2
+- location: ^8.0.1
+- firebase_core: ^3.0.0
+- firebase_auth: ^5.0.0
+- cloud_firestore: ^5.0.0
+- google_sign_in: ^6.2.1
+- http: ^1.2.1
+- image_picker: ^1.0.7
+- firebase_storage: ^12.0.0
+
+Run `flutter pub get` to install them.
+
+## ▶️ Helpful commands (Windows PowerShell examples)
+
+```powershell
+# Get dependencies
+flutter pub get
+
+# Run on connected device or default platform
+flutter run
+
+# Run with a specific device id (list devices first)
+flutter devices; flutter run -d <deviceId>
+
+# Build release APK
+flutter build apk --release
+
+# Build web release
+flutter build web --release
+
+# Clean build artifacts
+flutter clean; flutter pub get
+
+# Static analysis and formatting
+flutter analyze
+dart format .
+flutter test
+```
+
+## 📁 Important files & locations
+
+- `lib/main.dart` — App entry point and Firebase initialization
+- `lib/app/app.dart` — Top-level app widget
+- `lib/app/router.dart` — Route definitions (uses GoRouter)
+- `lib/firebase_options.dart` — Generated Firebase config
+- `android/app/google-services.json` — Android Firebase config
+
+## ✅ Project notes / gotchas
+
+- The project expects `firebase_options.dart` to be present. If you regenerate Firebase configuration for a new Firebase project, update that file and keep corresponding platform files (`google-services.json`, `GoogleService-Info.plist`) in place.
+- Map features rely on `google_maps_flutter` and platform-specific API keys (ensure Android `AndroidManifest.xml` and iOS plist have proper API keys when enabling Maps).
+
+## Contributors / Contact
+
+This project was developed by Group 34 for the Mobile Development course at Universidad de los Andes. For questions about this repository, open an issue or contact the repository owner.

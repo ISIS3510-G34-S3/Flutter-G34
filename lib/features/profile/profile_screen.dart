@@ -25,10 +25,8 @@ class ProfileScreen extends StatelessWidget {
         ? (authUser.email ?? '').toLowerCase()
         : authUser.uid;
 
-    final doc = await FirebaseFirestore.instance
-        .collection('users')
-        .doc(docId)
-        .get();
+    final doc =
+        await FirebaseFirestore.instance.collection('users').doc(docId).get();
     final data = doc.data() ?? <String, dynamic>{};
 
     return Host(
@@ -36,9 +34,11 @@ class ProfileScreen extends StatelessWidget {
       name: (data['displayName'] ?? authUser.displayName ?? 'User') as String,
       email: (data['email'] ?? authUser.email ?? '') as String,
       isVerified: (data['isVerified'] ?? false) as bool,
-      memberSince:
-          (data['createdAt'] is Timestamp) ? (data['createdAt'] as Timestamp).toDate() : DateTime.now(),
-      languages: List<String>.from((data['languages'] ?? const <String>[]) as List),
+      memberSince: (data['createdAt'] is Timestamp)
+          ? (data['createdAt'] as Timestamp).toDate()
+          : DateTime.now(),
+      languages:
+          List<String>.from((data['languages'] ?? const <String>[]) as List),
       responseRate: (data['responseRate'] ?? '100%') as String,
       about: (data['about'] ?? 'Tell others about yourself.') as String,
       hostedExperiences: (data['hostedExperiences'] ?? 0) as int,
@@ -80,7 +80,8 @@ class ProfileScreen extends StatelessWidget {
             return Center(
               child: Text(
                 'Failed to load profile',
-                style: AppTypography.bodyMedium.copyWith(color: AppColors.textPrimary),
+                style: AppTypography.bodyMedium
+                    .copyWith(color: AppColors.textPrimary),
               ),
             );
           }
@@ -89,7 +90,8 @@ class ProfileScreen extends StatelessWidget {
             return Center(
               child: Text(
                 'No profile data',
-                style: AppTypography.bodyMedium.copyWith(color: AppColors.textPrimary),
+                style: AppTypography.bodyMedium
+                    .copyWith(color: AppColors.textPrimary),
               ),
             );
           }
@@ -570,7 +572,8 @@ class ProfileScreen extends StatelessWidget {
             _buildSettingItem(
               icon: Icons.notifications_outlined,
               title: 'Notification Preferences',
-              onTap: () => _showComingSoonDialog(context, 'Notification Preferences'),
+              onTap: () =>
+                  _showComingSoonDialog(context, 'Notification Preferences'),
             ),
             _buildSettingItem(
               icon: Icons.privacy_tip_outlined,
@@ -739,9 +742,11 @@ class ProfileScreen extends StatelessWidget {
             ),
           ),
           TextButton(
-            onPressed: () {
+            onPressed: () async {
               Navigator.of(context).pop();
-              context.go('/login');
+              // Sign out from Firebase
+              await FirebaseAuth.instance.signOut();
+              // Router will automatically redirect to login due to auth state change
             },
             child: Text(
               'Log Out',
