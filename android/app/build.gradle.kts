@@ -27,7 +27,7 @@ android {
         applicationId = "com.example.travel_connect"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = 23  // Required by Firebase Auth 23.2.1
+        minSdk = flutter.minSdkVersion  // Required by Firebase Auth 23.2.1
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
