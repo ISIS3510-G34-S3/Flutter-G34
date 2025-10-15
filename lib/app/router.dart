@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../features/auth/login_screen.dart';
 import '../features/auth/create_account_screen.dart';
 import '../features/explore/discover_screen.dart';
@@ -15,9 +16,37 @@ import '../widgets/main_scaffold.dart';
 import '../features/experience/my_experiences_screen.dart';
 import '../features/experience/edit_experience_screen.dart';
 
+/// Auth state notifier to make router reactive to auth changes
+class AuthNotifier extends ChangeNotifier {
+  AuthNotifier() {
+    FirebaseAuth.instance.authStateChanges().listen((_) {
+      notifyListeners();
+    });
+  }
+}
+
 /// Main router configuration for the app
 final GoRouter appRouter = GoRouter(
   initialLocation: '/login',
+  refreshListenable: AuthNotifier(),
+  redirect: (BuildContext context, GoRouterState state) {
+    final user = FirebaseAuth.instance.currentUser;
+    final isLoggingIn = state.matchedLocation == '/login' ||
+        state.matchedLocation == '/create-account';
+
+    // If user is logged in and trying to access login/create-account, redirect to discover
+    if (user != null && isLoggingIn) {
+      return '/discover';
+    }
+
+    // If user is not logged in and trying to access protected routes, redirect to login
+    if (user == null && !isLoggingIn) {
+      return '/login';
+    }
+
+    // No redirect needed
+    return null;
+  },
   routes: [
     // Login route (standalone)
     GoRoute(
