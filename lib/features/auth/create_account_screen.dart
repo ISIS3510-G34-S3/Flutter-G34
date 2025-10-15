@@ -24,9 +24,10 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
-  
+
   String _selectedUserType = 'Traveler';
   bool _isLoading = false;
+  bool _passwordFieldFocused = false;
 
   @override
   void dispose() {
@@ -69,7 +70,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
               children: [
                 // User type selection
                 _buildUserTypeSelection(),
-                
+
                 const SizedBox(height: 32),
 
                 // Full Name field
@@ -166,7 +167,9 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
       child: Container(
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: isSelected ? AppColors.oliveGold.withValues(alpha: 0.1) : AppColors.background,
+          color: isSelected
+              ? AppColors.oliveGold.withValues(alpha: 0.1)
+              : AppColors.background,
           border: Border.all(
             color: isSelected ? AppColors.oliveGold : AppColors.divider,
             width: isSelected ? 2 : 1,
@@ -178,7 +181,9 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: isSelected ? AppColors.oliveGold : AppColors.textSecondary.withValues(alpha: 0.3),
+                color: isSelected
+                    ? AppColors.oliveGold
+                    : AppColors.textSecondary.withValues(alpha: 0.3),
                 shape: BoxShape.circle,
               ),
               child: Icon(
@@ -191,7 +196,8 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
             Text(
               userType,
               style: AppTypography.bodyMedium.copyWith(
-                color: isSelected ? AppColors.oliveGold : AppColors.textSecondary,
+                color:
+                    isSelected ? AppColors.oliveGold : AppColors.textSecondary,
                 fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
               ),
             ),
@@ -244,9 +250,11 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
               borderRadius: BorderRadius.circular(8),
               borderSide: BorderSide(color: AppColors.lava),
             ),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
           ),
-          style: AppTypography.bodyMedium.copyWith(color: AppColors.textPrimary),
+          style:
+              AppTypography.bodyMedium.copyWith(color: AppColors.textPrimary),
           validator: (value) {
             if (value == null || value.trim().isEmpty) {
               return 'Please enter your full name';
@@ -310,9 +318,11 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
               borderRadius: BorderRadius.circular(8),
               borderSide: BorderSide(color: AppColors.lava),
             ),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
           ),
-          style: AppTypography.bodyMedium.copyWith(color: AppColors.textPrimary),
+          style:
+              AppTypography.bodyMedium.copyWith(color: AppColors.textPrimary),
           validator: (value) {
             if (value == null || value.trim().isEmpty) {
               return 'Please enter your email';
@@ -320,7 +330,8 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
             final email = value.trim();
             // Allowed: letters, digits, @, ., _, -
             // Disallow: non-ASCII, spaces, other specials, consecutive dots, leading/trailing dots
-            if (!AppRegex.emailRegex.hasMatch(email)) return 'Please enter a valid email address';
+            if (!AppRegex.emailRegex.hasMatch(email))
+              return 'Please enter a valid email address';
             return null;
           },
         ),
@@ -343,6 +354,15 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
         TextFormField(
           controller: _passwordController,
           obscureText: true,
+          onChanged: (value) {
+            // Trigger rebuild to update requirements indicator
+            setState(() {});
+          },
+          onTap: () {
+            setState(() {
+              _passwordFieldFocused = true;
+            });
+          },
           decoration: InputDecoration(
             hintText: 'Create a password',
             hintStyle: AppTypography.bodyMedium.copyWith(
@@ -366,9 +386,11 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
               borderRadius: BorderRadius.circular(8),
               borderSide: BorderSide(color: AppColors.lava),
             ),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
           ),
-          style: AppTypography.bodyMedium.copyWith(color: AppColors.textPrimary),
+          style:
+              AppTypography.bodyMedium.copyWith(color: AppColors.textPrimary),
           validator: (value) {
             if (value == null || value.isEmpty) {
               return 'Please enter a password';
@@ -380,17 +402,17 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
             // Check if password matches the main password regex
             if (!AppRegex.passwordRegex.hasMatch(value)) {
               // Password is invalid, now check for specific issues
-              
+
               // Check for spaces
               if (AppRegex.passwordHasSpace.hasMatch(value)) {
                 return 'Password cannot contain spaces';
               }
-              
+
               // Check for emojis
               if (AppRegex.passwordHasEmoji.hasMatch(value)) {
                 return 'Password cannot contain emojis';
               }
-              
+
               // Check for invalid characters
               if (AppRegex.passwordHasInvalidChar.hasMatch(value)) {
                 return 'Password can only contain letters, digits, and @\$#!%?&_*';
@@ -412,10 +434,14 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
               // Generic fallback
               return 'Password does not meet requirements';
             }
-            
+
             return null;
           },
         ),
+        if (_passwordFieldFocused || _passwordController.text.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          _buildPasswordRequirements(),
+        ],
       ],
     );
   }
@@ -458,9 +484,11 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
               borderRadius: BorderRadius.circular(8),
               borderSide: BorderSide(color: AppColors.lava),
             ),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
           ),
-          style: AppTypography.bodyMedium.copyWith(color: AppColors.textPrimary),
+          style:
+              AppTypography.bodyMedium.copyWith(color: AppColors.textPrimary),
           validator: (value) {
             if (value == null || value.isEmpty) {
               return 'Please confirm your password';
@@ -472,6 +500,70 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
           },
         ),
       ],
+    );
+  }
+
+  Widget _buildPasswordRequirements() {
+    final password = _passwordController.text;
+    final hasMinLength = password.length >= 8;
+    final hasLowercase = AppRegex.passwordHasLowercase.hasMatch(password);
+    final hasUppercase = AppRegex.passwordHasUppercase.hasMatch(password);
+    final hasDigit = AppRegex.passwordHasDigit.hasMatch(password);
+    final hasSpecialChar = AppRegex.passwordHasSpecialChar.hasMatch(password);
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.oliveGold.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: AppColors.divider,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Password must contain:',
+            style: AppTypography.bodySmall.copyWith(
+              color: AppColors.textSecondary,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 8),
+          _buildRequirementItem('At least 8 characters', hasMinLength),
+          _buildRequirementItem('One lowercase letter (a-z)', hasLowercase),
+          _buildRequirementItem('One uppercase letter (A-Z)', hasUppercase),
+          _buildRequirementItem('One number (0-9)', hasDigit),
+          _buildRequirementItem(
+              'One special character (@\$#!%?&_)', hasSpecialChar),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRequirementItem(String text, bool isMet) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          Icon(
+            isMet ? Icons.check_circle : Icons.circle_outlined,
+            size: 16,
+            color: isMet ? AppColors.forestGreen : AppColors.textSecondary,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              text,
+              style: AppTypography.bodySmall.copyWith(
+                color: isMet ? AppColors.forestGreen : AppColors.textSecondary,
+                fontWeight: isMet ? FontWeight.w500 : FontWeight.normal,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -522,7 +614,6 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
       final email = _emailController.text.trim();
       final password = _passwordController.text.trim();
 
-
       // Create user with Firebase Auth
       final credential = await FirebaseAuth.instance
           .createUserWithEmailAndPassword(email: email, password: password);
@@ -555,10 +646,9 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
       }
     } on FirebaseAuthException catch (e) {
       if (!mounted) return;
-      final String message =
-          e.code == 'email-already-in-use'
-              ? 'Email already in use. If you signed up with Google, use Google Sign-In or reset your password.'
-              : (e.message ?? 'Failed to create account');
+      final String message = e.code == 'email-already-in-use'
+          ? 'Email already in use. If you signed up with Google, use Google Sign-In or reset your password.'
+          : (e.message ?? 'Failed to create account');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(message),
@@ -604,14 +694,16 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
       if (googleUser == null) {
         return; // cancelled
       }
-      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+      final GoogleSignInAuthentication googleAuth =
+          await googleUser.authentication;
 
       final credential = GoogleAuthProvider.credential(
         accessToken: googleAuth.accessToken,
         idToken: googleAuth.idToken,
       );
 
-      final userCred = await FirebaseAuth.instance.signInWithCredential(credential);
+      final userCred =
+          await FirebaseAuth.instance.signInWithCredential(credential);
       final user = userCred.user;
       if (user != null) {
         final emailId = (user.email ?? '').toLowerCase();
@@ -632,7 +724,8 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Signed in as ${user.displayName ?? user.email ?? 'Google user'}'),
+            content: Text(
+                'Signed in as ${user.displayName ?? user.email ?? 'Google user'}'),
             backgroundColor: AppColors.forestGreen,
           ),
         );
@@ -642,7 +735,8 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('[FirebaseAuth:${e.code}] ${e.message ?? 'Google sign-in failed'}'),
+          content: Text(
+              '[FirebaseAuth:${e.code}] ${e.message ?? 'Google sign-in failed'}'),
           backgroundColor: AppColors.lava,
         ),
       );
@@ -650,7 +744,8 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('[Platform:${e.code}] ${e.message ?? 'Platform error during Google sign-in'}'),
+          content: Text(
+              '[Platform:${e.code}] ${e.message ?? 'Platform error during Google sign-in'}'),
           backgroundColor: AppColors.lava,
         ),
       );
