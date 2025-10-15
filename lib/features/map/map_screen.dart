@@ -6,6 +6,7 @@ import '../../theme/colors.dart';
 import '../../theme/typography.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:location/location.dart';
+import '../../widgets/filters_bottom_sheet.dart';
 
 /// Map screen showing experience locations with pins
 class MapScreen extends StatefulWidget {
@@ -21,6 +22,14 @@ class _MapScreenState extends State<MapScreen> {
   final Set<Marker> _markers = {};
   final ExperienceService _experienceService = ExperienceService();
   bool _isLoading = true;
+
+  // All and filtered experiences for marker filtering
+  List<Experience> _allExperiences = [];
+  List<Experience> _filteredExperiences = [];
+
+  // Filter state
+  List<String> _selectedCategories = [];
+  List<String> _selectedRegions = [];
 
   // Location services
   final Location _location = Location();
@@ -42,11 +51,13 @@ class _MapScreenState extends State<MapScreen> {
   Future<void> _fetchExperiencesAndCreateMarkers() async {
     try {
       final experiences = await _experienceService.getExperiences();
-      final newMarkers = _createMarkersFromExperiences(experiences);
       if (mounted) {
         setState(() {
-          _markers.clear();
-          _markers.addAll(newMarkers);
+          _allExperiences = experiences;
+          _filteredExperiences = experiences;
+          _markers
+            ..clear()
+            ..addAll(_createMarkersFromExperiences(_filteredExperiences));
           _isLoading = false;
         });
       }
@@ -203,6 +214,9 @@ class _MapScreenState extends State<MapScreen> {
           // Custom zoom controls
           _buildZoomControls(),
 
+          // Filters button
+          _buildFiltersButton(),
+
           // Bottom sheet for selected experience
           if (_selectedExperience != null)
             _buildBottomSheet(_selectedExperience!),
@@ -292,6 +306,34 @@ class _MapScreenState extends State<MapScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildFiltersButton() {
+    return Positioned(
+      left: 16,
+      top: 100,
+      child: Container(
+        decoration: BoxDecoration(
+          color: AppColors.white,
+          borderRadius: BorderRadius.circular(8),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.textPrimary.withValues(alpha: 0.2),
+              offset: const Offset(0, 2),
+              blurRadius: 8,
+            ),
+          ],
+        ),
+        child: IconButton(
+          onPressed: _openFilters,
+          icon: const Icon(
+            Icons.filter_list,
+            color: AppColors.textPrimary,
+          ),
+          tooltip: 'Filters',
+        ),
       ),
     );
   }
@@ -417,6 +459,55 @@ class _MapScreenState extends State<MapScreen> {
     if (_mapController != null) {
       await _mapController!.animateCamera(CameraUpdate.zoomOut());
     }
+  }
+
+  void _openFilters() {
+    if (_allExperiences.isEmpty) return;
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return FiltersBottomSheet(
+          selectedCategories: _selectedCategories,
+          selectedRegions: _selectedRegions,
+          selectedLanguages: const [],
+          minPrice: 0,
+          maxPrice: 0,
+          allExperiences: _allExperiences,
+          onApplyFilters: (categories, regions, _languages, _minPrice, _maxPrice) {
+            setState(() {
+              _selectedCategories = List.from(categories);
+              _selectedRegions = List.from(regions);
+            });
+            _applyFiltersAndUpdateMarkers();
+          },
+        );
+      },
+    );
+  }
+
+  void _applyFiltersAndUpdateMarkers() {
+    List<Experience> result = List.from(_allExperiences);
+
+    if (_selectedRegions.isNotEmpty) {
+      result = result
+          .where((e) => _selectedRegions.contains(e.department))
+          .toList();
+    }
+
+    if (_selectedCategories.isNotEmpty) {
+      result = result
+          .where((e) => e.categories.any(_selectedCategories.contains))
+          .toList();
+    }
+
+    setState(() {
+      _filteredExperiences = result;
+      _markers
+        ..clear()
+        ..addAll(_createMarkersFromExperiences(_filteredExperiences));
+    });
   }
 
   void _moveToUserLocation() async {
