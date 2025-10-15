@@ -361,51 +361,11 @@ class _ExperienceRecommendationCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Experience card
-          ExperienceCard(
-            experience: recommendation.experience,
-            onTap: () {
-              context.push('/experience/${recommendation.experience.id}');
-            },
-          ),
-
-          // Explanation
-          if (recommendation.explanation.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.blue[50],
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.blue[200]!),
-              ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Icon(
-                    Icons.lightbulb_outline,
-                    size: 20,
-                    color: Colors.blue[700],
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      recommendation.explanation,
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.blue[900],
-                        height: 1.4,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ],
+      child: ExperienceCard(
+        experience: recommendation.experience,
+        onTap: () {
+          context.push('/experience/${recommendation.experience.id}');
+        },
       ),
     );
   }
