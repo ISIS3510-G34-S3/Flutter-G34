@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../models/experience.dart';
 import 'experience_service.dart';
@@ -30,6 +31,12 @@ class ChatbotService {
       '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';
   static const String _apiUrl =
       'https://integrate.api.nvidia.com/v1/chat/completions';
+
+  // Fallback messages to ensure we never return empty responses
+  static const String _fallbackMessage =
+      'I apologize, but I couldn\'t generate a proper response. Please try rephrasing your question or ask me about specific experiences in Colombia.';
+  static const String _fallbackMessageSpanish =
+      'Lo siento, no pude generar una respuesta adecuada. Por favor, intenta reformular tu pregunta o pregúntame sobre experiencias específicas en Colombia.';
 
   final ExperienceService _experienceService = ExperienceService();
 
@@ -67,38 +74,63 @@ class ChatbotService {
       final streamedResponse = await request.send().timeout(
         const Duration(seconds: 30),
         onTimeout: () {
-          throw Exception('Connection timeout - Please check your internet connection');
+          throw Exception(
+              'Connection timeout - Please check your internet connection');
         },
       );
       final response = await http.Response.fromStream(streamedResponse);
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        final aiResponse = data['choices'][0]['message']['content'];
+
+        // Validate API response structure
+        if (data == null ||
+            data['choices'] == null ||
+            data['choices'].isEmpty ||
+            data['choices'][0]['message'] == null ||
+            data['choices'][0]['message']['content'] == null) {
+          debugPrint('Invalid API response structure');
+          return ChatbotResponse(
+            text: _getFallbackMessage(userMessage),
+            recommendations: [],
+          );
+        }
+
+        final aiResponse = data['choices'][0]['message']['content'] as String;
+
+        // Validate that AI response is not empty
+        if (aiResponse.trim().isEmpty) {
+          debugPrint('AI returned empty response');
+          return ChatbotResponse(
+            text: _getFallbackMessage(userMessage),
+            recommendations: [],
+          );
+        }
 
         // Parse the response to extract experience IDs and recommendations
-        return _parseResponse(aiResponse, experiences);
+        return _parseResponse(aiResponse, experiences, userMessage);
       } else {
-        print('API Error: ${response.statusCode} - ${response.body}');
+        debugPrint('API Error: ${response.statusCode} - ${response.body}');
         return ChatbotResponse(
-          text: 'Sorry, I encountered an error. Please try again. (Error ${response.statusCode})',
+          text:
+              'Sorry, I encountered an error. Please try again. (Error ${response.statusCode})',
           recommendations: [],
         );
       }
     } on http.ClientException catch (e) {
-      print('Network Error: $e');
-      print('This usually means:');
-      print('1. No internet connection');
-      print('2. API endpoint is blocked or unreachable');
-      print('3. SSL/Certificate issues');
+      debugPrint('Network Error: $e');
+      debugPrint('This usually means:');
+      debugPrint('1. No internet connection');
+      debugPrint('2. API endpoint is blocked or unreachable');
+      debugPrint('3. SSL/Certificate issues');
       return ChatbotResponse(
         text:
             'Unable to connect to the server. Please check your internet connection and try again.',
         recommendations: [],
       );
     } catch (e, stackTrace) {
-      print('Error in chatbot service: $e');
-      print('Stack trace: $stackTrace');
+      debugPrint('Error in chatbot service: $e');
+      debugPrint('Stack trace: $stackTrace');
       return ChatbotResponse(
         text:
             'Sorry, I encountered an error processing your request. Please try again.',
@@ -109,7 +141,7 @@ class ChatbotService {
 
   /// Parse AI response to extract experience recommendations
   ChatbotResponse _parseResponse(
-      String aiResponse, List<Experience> allExperiences) {
+      String aiResponse, List<Experience> allExperiences, String userMessage) {
     final recommendations = <ExperienceRecommendation>[];
 
     // Create a map for quick experience lookup by ID
@@ -142,6 +174,13 @@ class ChatbotService {
     cleanedText = cleanedText.replaceAll(
         RegExp(r'\n{3,}'), '\n\n'); // Remove excessive newlines
     cleanedText = cleanedText.trim();
+
+    // FAILSAFE: Ensure we never return an empty text response
+    if (cleanedText.isEmpty) {
+      debugPrint(
+          'Warning: Cleaned text is empty after parsing. Using fallback.');
+      cleanedText = _getFallbackMessage(userMessage);
+    }
 
     return ChatbotResponse(
       text: cleanedText,
@@ -187,6 +226,34 @@ class ChatbotService {
     return explanation.isNotEmpty
         ? explanation
         : 'This experience matches your preferences.';
+  }
+
+  /// Get appropriate fallback message based on detected language
+  String _getFallbackMessage(String userMessage) {
+    // Simple language detection: check for common Spanish words
+    final spanishIndicators = [
+      'hola',
+      'qué',
+      'cómo',
+      'dónde',
+      'cuánto',
+      'por favor',
+      'gracias',
+      'experiencia',
+      'precio',
+      'busco',
+      'quiero',
+      'me gustaría',
+      'necesito',
+      'ayuda',
+      'puedes'
+    ];
+
+    final lowerMessage = userMessage.toLowerCase();
+    final isSpanish =
+        spanishIndicators.any((word) => lowerMessage.contains(word));
+
+    return isSpanish ? _fallbackMessageSpanish : _fallbackMessage;
   }
 
   /// Build the context string with all available experiences
