@@ -9,11 +9,13 @@ TravelConnect is a mobile application that allows users to discover, share, and 
 ## 🚀 Features
 
 - **User Authentication**: Login system for personalized experiences
-- **Experience Discovery**: Browse and filter cultural experiences
-- **Interactive Map**: Explore experiences geographically
-- **Create Experiences**: Share your own cultural adventures
-- **User Profiles**: Personalized user profiles and experience history
-- **Modern UI**: Material Design 3 with custom theming
+- **Experience Discovery**: Browse and filter cultural experiences with advanced search
+- **Interactive Map**: Explore experiences geographically with location-based navigation
+- **Create Experiences**: Share your own cultural adventures with photo uploads
+- **Detailed Experience Views**: Comprehensive information including pricing, categories, host profiles, and reviews
+- **User Profiles**: Personalized user profiles and experience management
+- **Photo Galleries**: Swipeable image galleries for experiences
+- **Modern UI**: Material Design 3 with custom theming and responsive layouts
 
 ## 🏗️ Project Structure
 
@@ -110,11 +112,19 @@ lib/
 ### Routes Structure:
 
 - `/login` - Authentication screen
-- `/discover` - Main discovery screen (home)
-- `/map` - Map view of experiences
-- `/create` - Create new experience
-- `/profile/:id` - User profile
-- `/experience/:id` - Experience details
+- `/discover` - Main discovery screen (home) with search and filters
+- `/map` - Map view of experiences (supports query params: `?lat=<latitude>&lng=<longitude>` for centering)
+- `/create` - Create new experience with location picker and photo upload
+- `/my-experiences` - View and manage user's created experiences
+- `/profile/:id` - User profile (dynamic routing)
+- `/experience/:id` - Experience details with full information
+- `/experience/:id/edit` - Edit existing experience
+
+### Key Navigation Flows:
+
+1. **Experience Creation**: After successfully creating an experience, users are redirected to `/my-experiences`
+2. **Map Integration**: Detail pages can link to map view with specific coordinates using query parameters
+3. **Keyboard Handling**: Search interfaces automatically dismiss keyboard on tap-outside or clear actions
 
 ## 🔧 Setup Instructions
 
@@ -273,6 +283,35 @@ For more information about Flutter development, visit the [Flutter documentation
 - Current app version: `1.0.0+1`
 - Dart SDK constraint: `>=3.0.0 <4.0.0`
 - Current branch: `sarenasr` (development branch used in this workspace)
+
+## 🎯 Recent Enhancements
+
+### Experience Detail Screen
+
+- **Comprehensive Information Display**: Added price formatting (e.g., "120K COP"), duration, max group size, and categories
+- **Host Profile Integration**: Displays host name, avatar, verification badge, and links to full profile
+- **Photo Gallery**: Multi-image swipeable gallery with page indicators
+- **Location Integration**: "View on Map" button that centers map on experience coordinates
+- **Reviews Summary**: Shows average rating and review count with navigation to reviews
+
+### Create Experience Flow
+
+- **Default Selections**: Pre-selects Spanish language and cash payment for faster creation
+- **Location Picker Enhancement**: Visual confirmation with pin icon and coordinate display
+- **Navigation Fix**: Automatically redirects to "My Experiences" after successful creation
+- **Photo Upload**: Firebase Storage integration for experience images
+
+### Map Integration
+
+- **Deep Linking**: Accepts `lat` and `lng` query parameters to center on specific coordinates
+- **Auto-selection**: Automatically selects nearby experience when centering on coordinates
+- **Enhanced UX**: Smooth camera animations and location-based filtering
+
+### UI/UX Improvements
+
+- **Keyboard Handling**: Fixed overflow issues in Discover screen with keyboard-aware layouts
+- **Consistent Typography**: Improved text color consistency across My Experiences screen
+- **Responsive Design**: Better handling of various screen sizes and orientations
 
 ## 🔐 Firebase configuration (project-specific)
 

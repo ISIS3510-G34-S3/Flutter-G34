@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import '../../theme/colors.dart';
 import '../../theme/typography.dart';
 import '../../mock/mock_data.dart';
@@ -43,7 +44,9 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
 
   static const List<String> _languageOptions = ['es', 'en', 'pt', 'fr'];
   static const List<String> _paymentOptions = ['cash', 'card'];
-  static const String _placesApiKey = String.fromEnvironment('GOOGLE_PLACES_API_KEY', defaultValue: 'AIzaSyA0TPkWq9uNvEA0Qhw2NVBihLbRTroYabE');
+  static const String _placesApiKey = String.fromEnvironment(
+      'GOOGLE_PLACES_API_KEY',
+      defaultValue: 'AIzaSyA0TPkWq9uNvEA0Qhw2NVBihLbRTroYabE');
 
   // Google Places typeahead state
   List<Map<String, dynamic>> _placeSuggestions = [];
@@ -168,6 +171,7 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
       ],
     );
   }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -582,7 +586,8 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
                   dense: true,
                   title: Text(
                     (s['description'] as String?) ?? '',
-                    style: AppTypography.bodyMedium.copyWith(color: AppColors.textPrimary),
+                    style: AppTypography.bodyMedium
+                        .copyWith(color: AppColors.textPrimary),
                   ),
                   onTap: () async {
                     final placeId = s['place_id'] as String?;
@@ -590,9 +595,12 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
                       final details = await _fetchPlaceDetails(placeId);
                       if (!mounted) return;
                       setState(() {
-                        _selectedGeoPoint = GeoPoint((details['lat'] as num).toDouble(), (details['lng'] as num).toDouble());
+                        _selectedGeoPoint = GeoPoint(
+                            (details['lat'] as num).toDouble(),
+                            (details['lng'] as num).toDouble());
                         _selectedLocationLabel = s['description'] as String?;
-                        _locationSearchController.text = _selectedLocationLabel ?? '';
+                        _locationSearchController.text =
+                            _selectedLocationLabel ?? '';
                         _selectedDepartment = details['department'] as String?;
                         _placeSuggestions = [];
                       });
@@ -601,11 +609,6 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
                 );
               },
             ),
-          ),
-        if (_selectedLocationLabel != null)
-          Text(
-            'Selected: $_selectedLocationLabel',
-            style: AppTypography.bodySmall,
           ),
       ],
     );
@@ -658,7 +661,8 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
             .map((s) => ListTile(
                   title: Text(
                     s['description'] as String? ?? '',
-                    style: AppTypography.bodyMedium.copyWith(color: AppColors.textPrimary),
+                    style: AppTypography.bodyMedium
+                        .copyWith(color: AppColors.textPrimary),
                   ),
                   onTap: () async {
                     final placeId = s['place_id'] as String?;
@@ -666,9 +670,11 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
                       final details = await _fetchPlaceDetails(placeId);
                       if (!mounted) return;
                       setState(() {
-                        _selectedGeoPoint = GeoPoint(details['lat']!, details['lng']!);
+                        _selectedGeoPoint =
+                            GeoPoint(details['lat']!, details['lng']!);
                         _selectedLocationLabel = s['description'] as String?;
-                        _locationSearchController.text = _selectedLocationLabel ?? '';
+                        _locationSearchController.text =
+                            _selectedLocationLabel ?? '';
                         _placeSuggestions = [];
                       });
                     }
@@ -680,7 +686,8 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
     );
   }
 
-  Future<List<Map<String, dynamic>>> _fetchPlaceSuggestions(String input) async {
+  Future<List<Map<String, dynamic>>> _fetchPlaceSuggestions(
+      String input) async {
     final uri = Uri.parse(
         'https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${Uri.encodeQueryComponent(input)}&types=geocode&key=$_placesApiKey');
     final res = await http.get(uri);
@@ -694,7 +701,8 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
     final uri = Uri.parse(
         'https://maps.googleapis.com/maps/api/place/details/json?place_id=$placeId&fields=geometry,address_components&key=$_placesApiKey');
     final res = await http.get(uri);
-    if (res.statusCode != 200) return {'lat': 0.0, 'lng': 0.0, 'department': null};
+    if (res.statusCode != 200)
+      return {'lat': 0.0, 'lng': 0.0, 'department': null};
     final data = json.decode(res.body) as Map<String, dynamic>;
     final result = (data['result'] as Map?) ?? {};
     final loc = ((result['geometry'] as Map?)?['location'] as Map?) ?? {};
@@ -721,7 +729,10 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
   Future<void> _pickAndUploadFromCamera() async {
     try {
       final ImagePicker picker = ImagePicker();
-      final XFile? captured = await picker.pickImage(source: ImageSource.camera, preferredCameraDevice: CameraDevice.rear, imageQuality: 85);
+      final XFile? captured = await picker.pickImage(
+          source: ImageSource.camera,
+          preferredCameraDevice: CameraDevice.rear,
+          imageQuality: 85);
       if (captured == null) return;
 
       // Upload to Firebase Storage under user ID folder
@@ -730,14 +741,16 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
         throw Exception('No authenticated user');
       }
       final String uid = user.uid;
-      final String fileName = 'photo_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      final String fileName =
+          'photo_${DateTime.now().millisecondsSinceEpoch}.jpg';
       final File file = File(captured.path);
 
       final storage = FirebaseStorage.instanceFor(
         bucket: 'gs://travelappbd-8e204.firebasestorage.app',
       );
       final ref = storage.ref().child('experiences/$uid/$fileName');
-      final uploadTask = await ref.putFile(file, SettableMetadata(contentType: 'image/jpeg'));
+      final uploadTask =
+          await ref.putFile(file, SettableMetadata(contentType: 'image/jpeg'));
       final String downloadUrl = await uploadTask.ref.getDownloadURL();
 
       if (!mounted) return;
@@ -772,11 +785,11 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
       if (_selectedCategories.isEmpty) {
         throw Exception('Please select at least one category');
       }
-      if (_selectedPaymentOptions.isEmpty) {
-        _selectedPaymentOptions = ['cash'];
-      }
       if (_selectedLanguages.isEmpty) {
-        _selectedLanguages = ['es'];
+        throw Exception('Please select at least one language');
+      }
+      if (_selectedPaymentOptions.isEmpty) {
+        throw Exception('Please select at least one payment option');
       }
       final authUser = FirebaseAuth.instance.currentUser;
       if (authUser == null) {
@@ -786,7 +799,8 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
       final hostDocId = (authUser.email ?? '').toLowerCase().isNotEmpty
           ? (authUser.email ?? '').toLowerCase()
           : authUser.uid;
-      final hostRef = FirebaseFirestore.instance.collection('users').doc(hostDocId);
+      final hostRef =
+          FirebaseFirestore.instance.collection('users').doc(hostDocId);
       final hostSnap = await hostRef.get();
       final hostData = hostSnap.data() ?? <String, dynamic>{};
 
@@ -794,7 +808,8 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
       final String summary = _descriptionController.text.trim();
       final String department = _selectedDepartment ?? '';
       final int duration = int.tryParse(_durationController.text.trim()) ?? 0;
-      final List<String> categories = _selectedCategories.map((c) => c.toLowerCase()).toList();
+      final List<String> categories =
+          _selectedCategories.map((c) => c.toLowerCase()).toList();
       final List<String> skillsToTeach = _skillsToTeachController.text
           .split(',')
           .map((s) => s.trim())
@@ -806,7 +821,8 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
           .where((s) => s.isNotEmpty)
           .toList();
       final int price = int.tryParse(_priceController.text.trim()) ?? 0;
-      final int groupSizeMax = int.tryParse(_groupSizeController.text.trim()) ?? 0;
+      final int groupSizeMax =
+          int.tryParse(_groupSizeController.text.trim()) ?? 0;
 
       final Map<String, dynamic> experience = {
         'title': title,
@@ -825,13 +841,23 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
         'images': _imageUrls,
         'isActive': true,
         'location': _selectedGeoPoint,
-        'skillsToTeach': skillsToTeach.isEmpty ? <String>[_skillsToTeachController.text.trim()].where((e) => e.isNotEmpty).toList() : skillsToTeach,
-        'skillsToLearn': skillsToLearn.isEmpty ? <String>[_skillsToLearnController.text.trim()].where((e) => e.isNotEmpty).toList() : skillsToLearn,
+        'skillsToTeach': skillsToTeach.isEmpty
+            ? <String>[_skillsToTeachController.text.trim()]
+                .where((e) => e.isNotEmpty)
+                .toList()
+            : skillsToTeach,
+        'skillsToLearn': skillsToLearn.isEmpty
+            ? <String>[_skillsToLearnController.text.trim()]
+                .where((e) => e.isNotEmpty)
+                .toList()
+            : skillsToLearn,
         'createdAt': FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
       };
 
-      await FirebaseFirestore.instance.collection('experiences').add(experience);
+      await FirebaseFirestore.instance
+          .collection('experiences')
+          .add(experience);
 
       if (!mounted) return;
 
@@ -839,6 +865,10 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
         _isLoading = false;
       });
 
+      // Navigate to My Experiences screen
+      context.go('/my-experiences');
+
+      // Show success message after navigation
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -849,24 +879,6 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
           duration: const Duration(seconds: 3),
         ),
       );
-
-      _formKey.currentState!.reset();
-      _titleController.clear();
-      _descriptionController.clear();
-      _durationController.clear();
-      _priceController.clear();
-      _groupSizeController.clear();
-      _locationSearchController.clear();
-      _skillsToTeachController.clear();
-      _skillsToLearnController.clear();
-      setState(() {
-        _selectedCategories = [];
-        _selectedLanguages = [];
-        _selectedPaymentOptions = [];
-        _imageUrls.clear();
-        _selectedGeoPoint = null;
-        _selectedLocationLabel = null;
-      });
     } catch (e) {
       if (!mounted) return;
       setState(() {

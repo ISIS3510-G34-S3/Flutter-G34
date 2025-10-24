@@ -20,7 +20,8 @@ class _MyExperiencesScreenState extends State<MyExperiencesScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Delete experience'),
-        content: Text('Are you sure you want to delete "${exp.title}"? This cannot be undone.'),
+        content: Text(
+            'Are you sure you want to delete "${exp.title}"? This cannot be undone.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
@@ -69,8 +70,6 @@ class _MyExperiencesScreenState extends State<MyExperiencesScreen> {
     context.push('/experience/$id');
   }
 
-  
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -102,11 +101,13 @@ class _MyExperiencesScreenState extends State<MyExperiencesScreen> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.post_add_outlined, size: 48, color: AppColors.textSecondary),
+                    const Icon(Icons.post_add_outlined,
+                        size: 48, color: AppColors.textSecondary),
                     const SizedBox(height: 12),
                     Text(
                       'You have not created any experiences yet',
-                      style: AppTypography.bodyLarge.copyWith(color: AppColors.textPrimary),
+                      style: AppTypography.bodyLarge
+                          .copyWith(color: AppColors.textPrimary),
                       textAlign: TextAlign.center,
                     ),
                     const SizedBox(height: 12),
@@ -129,13 +130,25 @@ class _MyExperiencesScreenState extends State<MyExperiencesScreen> {
                 onTap: () => _openDetail(exp.id),
                 leading: CircleAvatar(
                   backgroundColor: AppColors.forestGreen.withOpacity(0.1),
-                  child: const Icon(Icons.explore_outlined, color: AppColors.forestGreen),
+                  child: const Icon(Icons.explore_outlined,
+                      color: AppColors.forestGreen),
                 ),
-                title: Text(exp.title, maxLines: 1, overflow: TextOverflow.ellipsis),
+                title: Text(
+                  exp.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTypography.bodyLarge.copyWith(
+                    color: AppColors.textPrimary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
                 subtitle: Text(
                   exp.summary,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
+                  style: AppTypography.bodyMedium.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
                 ),
                 trailing: Wrap(
                   spacing: 4,
@@ -143,7 +156,8 @@ class _MyExperiencesScreenState extends State<MyExperiencesScreen> {
                     IconButton(
                       icon: const Icon(Icons.edit_outlined),
                       tooltip: 'Edit',
-                      onPressed: () => context.push('/experience/${exp.id}/edit'),
+                      onPressed: () =>
+                          context.push('/experience/${exp.id}/edit'),
                     ),
                     IconButton(
                       icon: const Icon(Icons.delete_outline),
@@ -160,5 +174,3 @@ class _MyExperiencesScreenState extends State<MyExperiencesScreen> {
     );
   }
 }
-
-

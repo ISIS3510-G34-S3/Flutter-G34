@@ -49,7 +49,8 @@ class MainScaffold extends StatelessWidget {
   int _calculateSelectedIndex(String location) {
     if (location.startsWith('/discover')) return 0;
     if (location.startsWith('/map')) return 1;
-    if (location.startsWith('/my-experiences')) return 2;
+    if (location.startsWith('/my-experiences') ||
+        location.startsWith('/create')) return 2;
     if (location.startsWith('/profile')) return 3;
     return 0; // Default to home
   }
