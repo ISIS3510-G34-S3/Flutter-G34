@@ -1,50 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:travel_connect/services/host_service.dart';
 import '../../theme/colors.dart';
 import '../../theme/typography.dart';
-import '../../mock/mock_data.dart';
+import '../../models/host.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 
 /// Profile screen showing user information and verification status
 class ProfileScreen extends StatelessWidget {
-  const ProfileScreen({
+  ProfileScreen({
     super.key,
     required this.profileId,
   });
 
   final String profileId;
-
-  Future<Host> _fetchCurrentUserHost() async {
-    final authUser = FirebaseAuth.instance.currentUser;
-    if (authUser == null) {
-      throw Exception('No authenticated user');
-    }
-
-    final docId = (authUser.email ?? '').toLowerCase().isNotEmpty
-        ? (authUser.email ?? '').toLowerCase()
-        : authUser.uid;
-
-    final doc =
-        await FirebaseFirestore.instance.collection('users').doc(docId).get();
-    final data = doc.data() ?? <String, dynamic>{};
-
-    return Host(
-      id: authUser.uid,
-      name: (data['displayName'] ?? authUser.displayName ?? 'User') as String,
-      email: (data['email'] ?? authUser.email ?? '') as String,
-      isVerified: (data['isVerified'] ?? false) as bool,
-      memberSince: (data['createdAt'] is Timestamp)
-          ? (data['createdAt'] as Timestamp).toDate()
-          : DateTime.now(),
-      languages:
-          List<String>.from((data['languages'] ?? const <String>[]) as List),
-      responseRate: (data['responseRate'] ?? '100%') as String,
-      about: (data['about'] ?? 'Tell others about yourself.') as String,
-      hostedExperiences: (data['hostedExperiences'] ?? 0) as int,
-      joinedExperiences: (data['joinedExperiences'] ?? 0) as int,
-    );
-  }
+  final HostService _hostService = HostService();
 
   @override
   Widget build(BuildContext context) {
@@ -61,17 +31,14 @@ class ProfileScreen extends StatelessWidget {
         automaticallyImplyLeading: false,
         actions: [
           IconButton(
+            icon: const Icon(Icons.edit, color: AppColors.white),
             onPressed: () => _editProfile(context),
-            icon: const Icon(
-              Icons.edit_outlined,
-              color: AppColors.white,
-            ),
             tooltip: 'Edit Profile',
           ),
         ],
       ),
-      body: FutureBuilder<Host>(
-        future: _fetchCurrentUserHost(),
+      body: FutureBuilder<Host?>(
+        future: _hostService.getCurrentUserHost(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
@@ -79,19 +46,17 @@ class ProfileScreen extends StatelessWidget {
           if (snapshot.hasError) {
             return Center(
               child: Text(
-                'Failed to load profile',
-                style: AppTypography.bodyMedium
-                    .copyWith(color: AppColors.textPrimary),
+                'Error: ${snapshot.error}',
+                style: const TextStyle(color: AppColors.error),
               ),
             );
           }
           final user = snapshot.data;
           if (user == null) {
-            return Center(
+            return const Center(
               child: Text(
-                'No profile data',
-                style: AppTypography.bodyMedium
-                    .copyWith(color: AppColors.textPrimary),
+                'Could not load user profile.',
+                style: TextStyle(color: AppColors.textSecondary),
               ),
             );
           }
