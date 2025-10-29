@@ -659,6 +659,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
           'displayName': name,
           'userType': _selectedUserType,
           'createdAt': FieldValue.serverTimestamp(),
+          'avgHostRating': 0.0,
         }, SetOptions(merge: true));
 
         if (!mounted) return;
@@ -745,6 +746,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
           'provider': 'google',
           'createdAt': FieldValue.serverTimestamp(),
           'lastSignInAt': FieldValue.serverTimestamp(),
+          'avgHostRating': 0.0,
         }, SetOptions(merge: true));
 
         if (!mounted) return;
