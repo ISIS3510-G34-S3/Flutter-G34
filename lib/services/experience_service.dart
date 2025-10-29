@@ -7,18 +7,59 @@ class ExperienceService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
-  Future<List<Experience>> getExperiences() async {
-    try {
-      QuerySnapshot snapshot = await _firestore.collection('experiences').get();
-      return snapshot.docs.map((doc) => Experience.fromFirestore(doc)).toList();
-    } catch (e) {
-      print(e);
-      return [];
+  Future<List<Experience>> getExperiences({bool forceRefresh = false}) async {
+    List<Experience> experiences = [];
+
+    // 1. Get from cache first, if not forcing a refresh.
+    if (!forceRefresh) {
+      try {
+        final cacheSnapshot = await _firestore
+            .collection('experiences')
+            .get(const GetOptions(source: Source.cache));
+        if (cacheSnapshot.docs.isNotEmpty) {
+          experiences = cacheSnapshot.docs
+              .map((doc) => Experience.fromFirestore(doc))
+              .toList();
+        }
+      } catch (e) {
+        // Cache might be empty or fail, which is fine.
+        print('Could not fetch from cache: $e');
+      }
     }
+
+    // 2. Then, try to get from server.
+    // This will update the cache for next time.
+    try {
+      final serverSnapshot = await _firestore.collection('experiences').get();
+      if (serverSnapshot.docs.isNotEmpty) {
+        experiences = serverSnapshot.docs
+            .map((doc) => Experience.fromFirestore(doc))
+            .toList();
+      }
+    } catch (e) {
+      print('Could not fetch from server: $e');
+      // If server fails, we will rely on the cached data (if any).
+    }
+
+    return experiences;
   }
 
   Future<Experience?> getExperienceById(String id) async {
     try {
+      // Try cache first
+      try {
+        final doc = await _firestore
+            .collection('experiences')
+            .doc(id)
+            .get(const GetOptions(source: Source.cache));
+        if (doc.exists) {
+          return Experience.fromFirestore(doc);
+        }
+      } catch (e) {
+        print('Could not get experience $id from cache: $e');
+      }
+
+      // Then try server
       DocumentSnapshot doc =
           await _firestore.collection('experiences').doc(id).get();
       if (doc.exists) {
@@ -75,7 +116,7 @@ class ExperienceService {
       return;
     }
 
-    final data = docSnap.data() as Map<String, dynamic>?;
+    final data = docSnap.data();
     final List images = (data?['images'] as List?) ?? const [];
 
     // Use the same bucket used in creation
