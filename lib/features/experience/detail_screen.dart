@@ -1,7 +1,10 @@
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:travel_connect/models/host.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:travel_connect/models/experience.dart';
 import 'package:travel_connect/services/experience_service.dart';
+import 'package:travel_connect/services/host_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../../theme/colors.dart';
@@ -22,8 +25,9 @@ class ExperienceDetailScreen extends StatefulWidget {
 
 class _ExperienceDetailScreenState extends State<ExperienceDetailScreen> {
   final ExperienceService _experienceService = ExperienceService();
+  final HostService _hostService = HostService();
   Experience? _experience;
-  Map<String, dynamic>? _hostData;
+  Host? _host;
   bool _isLoading = true;
   int _currentImageIndex = 0;
 
@@ -38,32 +42,29 @@ class _ExperienceDetailScreenState extends State<ExperienceDetailScreen> {
       final experience =
           await _experienceService.getExperienceById(widget.experienceId);
 
-      // Fetch host data
-      Map<String, dynamic>? hostData;
+      Host? host;
       if (experience != null) {
         try {
-          final hostDoc = await FirebaseFirestore.instance
-              .collection('users')
-              .doc(experience.hostId)
-              .get();
-          if (hostDoc.exists) {
-            hostData = hostDoc.data();
-          }
+          host = await _hostService.getHostById(experience.hostId);
         } catch (e) {
           debugPrint('Error fetching host data: $e');
         }
       }
 
-      setState(() {
-        _experience = experience;
-        _hostData = hostData;
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _experience = experience;
+          _host = host;
+          _isLoading = false;
+        });
+      }
     } catch (e) {
-      setState(() {
-        _isLoading = false;
-      });
-      // Handle error
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+      debugPrint('Error fetching experience: $e');
     }
   }
 
@@ -102,14 +103,14 @@ class _ExperienceDetailScreenState extends State<ExperienceDetailScreen> {
                 _buildTitleSection(_experience!),
 
                 // Photo gallery section
-                if (_experience!.images.length > 1)
+                if (_experience!.images.isNotEmpty)
                   _buildPhotoGallery(_experience!),
 
                 // Price and details section
                 _buildPriceAndDetailsSection(_experience!),
 
                 // Host section
-                if (_hostData != null) _buildHostSection(_experience!),
+                if (_host != null) _buildHostSection(_experience!),
 
                 // Location section
                 _buildLocationSection(_experience!),
@@ -167,21 +168,21 @@ class _ExperienceDetailScreenState extends State<ExperienceDetailScreen> {
                     _viewImageFullscreen(context, experience.images, index),
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(12),
-                  child: Image.network(
-                    experience.images[index],
+                  child: CachedNetworkImage(
+                    imageUrl: experience.images[index],
                     fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) {
-                      return Container(
-                        color: AppColors.peach.withValues(alpha: 0.3),
-                        child: const Center(
-                          child: Icon(
-                            Icons.broken_image,
-                            size: 48,
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                      );
-                    },
+                    placeholder: (context, url) => Container(
+                      color: AppColors.peach.withOpacity(0.3),
+                      child: const Center(child: CircularProgressIndicator()),
+                    ),
+                    errorWidget: (context, url, error) => Container(
+                      color: AppColors.peach.withOpacity(0.3),
+                      child: const Icon(
+                        Icons.broken_image,
+                        size: 48,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
                   ),
                 ),
               );
@@ -352,11 +353,12 @@ class _ExperienceDetailScreenState extends State<ExperienceDetailScreen> {
   }
 
   Widget _buildHostSection(Experience experience) {
-    if (_hostData == null) return const SizedBox.shrink();
+    if (_host == null) return const SizedBox.shrink();
 
-    final displayName = _hostData!['displayName'] as String? ?? 'Unknown Host';
-    final photoURL = _hostData!['photoURL'] as String?;
-    final isVerified = _hostData!['isVerified'] as bool? ?? false;
+    final host = _host!;
+    final displayName = host.name;
+    final photoURL = host.photoURL;
+    final isVerified = host.isVerified;
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -387,7 +389,7 @@ class _ExperienceDetailScreenState extends State<ExperienceDetailScreen> {
                 backgroundColor: AppColors.forestGreen.withValues(alpha: 0.2),
                 child: photoURL == null || photoURL.isEmpty
                     ? Text(
-                        displayName[0].toUpperCase(),
+                        displayName.isNotEmpty ? displayName[0].toUpperCase() : '?',
                         style: AppTypography.titleMedium.copyWith(
                           color: AppColors.forestGreen,
                         ),
@@ -427,13 +429,7 @@ class _ExperienceDetailScreenState extends State<ExperienceDetailScreen> {
               // View profile button
               OutlinedButton(
                 onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('User profiles coming soon!'),
-                      backgroundColor: AppColors.forestGreen,
-                      duration: Duration(seconds: 2),
-                    ),
-                  );
+                  context.push('/profile/${host.id}');
                 },
                 style: OutlinedButton.styleFrom(
                   padding:
@@ -580,9 +576,32 @@ class _ExperienceDetailScreenState extends State<ExperienceDetailScreen> {
           children: [
             // Image
             if (experience.images.isNotEmpty)
-              Image.network(
-                experience.images.first,
+              CachedNetworkImage(
+                imageUrl: experience.images.first,
                 fit: BoxFit.cover,
+                placeholder: (context, url) =>
+                    Container(color: AppColors.peach.withOpacity(0.3)),
+                errorWidget: (context, url, error) => Container(
+                  color: AppColors.peach.withOpacity(0.3),
+                  child: const Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.photo_camera_outlined,
+                        size: 48,
+                        color: AppColors.oliveGold,
+                      ),
+                      SizedBox(height: 8),
+                      Text(
+                        'Image Unavailable',
+                        style: TextStyle(
+                          color: AppColors.oliveGold,
+                          fontSize: 16,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               )
             else
               Container(
@@ -945,18 +964,18 @@ class _FullscreenImageViewerState extends State<_FullscreenImageViewer> {
             minScale: 0.5,
             maxScale: 4.0,
             child: Center(
-              child: Image.network(
-                widget.images[index],
+              child: CachedNetworkImage(
+                imageUrl: widget.images[index],
                 fit: BoxFit.contain,
-                errorBuilder: (context, error, stackTrace) {
-                  return const Center(
-                    child: Icon(
-                      Icons.broken_image,
-                      size: 64,
-                      color: Colors.white54,
-                    ),
-                  );
-                },
+                placeholder: (context, url) =>
+                    const Center(child: CircularProgressIndicator()),
+                errorWidget: (context, url, error) => const Center(
+                  child: Icon(
+                    Icons.broken_image,
+                    size: 64,
+                    color: Colors.white54,
+                  ),
+                ),
               ),
             ),
           );
