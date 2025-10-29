@@ -28,6 +28,8 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
   String _selectedUserType = 'Traveler';
   bool _isLoading = false;
   bool _passwordFieldFocused = false;
+  bool _obscurePassword = true;
+  bool _obscureConfirmPassword = true;
 
   @override
   void dispose() {
@@ -353,7 +355,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
         const SizedBox(height: 8),
         TextFormField(
           controller: _passwordController,
-          obscureText: true,
+          obscureText: _obscurePassword,
           onChanged: (value) {
             // Trigger rebuild to update requirements indicator
             setState(() {});
@@ -367,6 +369,18 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
             hintText: 'Create a password',
             hintStyle: AppTypography.bodyMedium.copyWith(
               color: AppColors.textSecondary,
+            ),
+            suffixIcon: IconButton(
+              icon: Icon(
+                _obscurePassword
+                    ? Icons.visibility_outlined
+                    : Icons.visibility_off_outlined,
+              ),
+              onPressed: () {
+                setState(() {
+                  _obscurePassword = !_obscurePassword;
+                });
+              },
             ),
             filled: true,
             fillColor: AppColors.white,
@@ -417,20 +431,20 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
               if (AppRegex.passwordHasInvalidChar.hasMatch(value)) {
                 return 'Password can only contain letters, digits, and @\$#!%?&_*';
               }
-              
+
               // Check for missing requirements
               if (!AppRegex.passwordHasLowercase.hasMatch(value)) {
                 return 'Password must contain at least one lowercase letter';
               }
-              
+
               if (!AppRegex.passwordHasUppercase.hasMatch(value)) {
                 return 'Password must contain at least one uppercase letter';
               }
-              
+
               if (!AppRegex.passwordHasDigit.hasMatch(value)) {
                 return 'Password must contain at least one digit';
               }
-              
+
               // Generic fallback
               return 'Password does not meet requirements';
             }
@@ -460,11 +474,23 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
         const SizedBox(height: 8),
         TextFormField(
           controller: _confirmPasswordController,
-          obscureText: true,
+          obscureText: _obscureConfirmPassword,
           decoration: InputDecoration(
             hintText: 'Confirm your password',
             hintStyle: AppTypography.bodyMedium.copyWith(
               color: AppColors.textSecondary,
+            ),
+            suffixIcon: IconButton(
+              icon: Icon(
+                _obscureConfirmPassword
+                    ? Icons.visibility_outlined
+                    : Icons.visibility_off_outlined,
+              ),
+              onPressed: () {
+                setState(() {
+                  _obscureConfirmPassword = !_obscureConfirmPassword;
+                });
+              },
             ),
             filled: true,
             fillColor: AppColors.white,

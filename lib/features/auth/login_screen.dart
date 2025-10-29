@@ -21,6 +21,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _isLoading = false;
+  bool _obscurePassword = true;
 
   @override
   void dispose() {
@@ -167,11 +168,23 @@ class _LoginScreenState extends State<LoginScreen> {
                 const SizedBox(height: 8),
                 TextFormField(
                   controller: _passwordController,
-                  obscureText: true,
+                  obscureText: _obscurePassword,
                   textInputAction: TextInputAction.done,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     hintText: 'Enter your password',
-                    prefixIcon: Icon(Icons.lock_outlined),
+                    prefixIcon: const Icon(Icons.lock_outlined),
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        _obscurePassword
+                            ? Icons.visibility_outlined
+                            : Icons.visibility_off_outlined,
+                      ),
+                      onPressed: () {
+                        setState(() {
+                          _obscurePassword = !_obscurePassword;
+                        });
+                      },
+                    ),
                   ),
                   validator: (value) {
                     if (value == null || value.isEmpty) {
@@ -402,7 +415,8 @@ class _LoginScreenState extends State<LoginScreen> {
         // Cancelled by user
         return;
       }
-      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+      final GoogleSignInAuthentication googleAuth =
+          await googleUser.authentication;
 
       // Create Firebase credential
       final oauthCredential = GoogleAuthProvider.credential(
@@ -411,7 +425,8 @@ class _LoginScreenState extends State<LoginScreen> {
       );
 
       // Sign in to Firebase
-      final userCred = await FirebaseAuth.instance.signInWithCredential(oauthCredential);
+      final userCred =
+          await FirebaseAuth.instance.signInWithCredential(oauthCredential);
       final user = userCred.user;
 
       if (user != null) {
@@ -432,7 +447,8 @@ class _LoginScreenState extends State<LoginScreen> {
           if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Create the account with Google first before logging in with Google.'),
+              content: Text(
+                  'Create the account with Google first before logging in with Google.'),
               backgroundColor: AppColors.lava,
             ),
           );
@@ -456,7 +472,8 @@ class _LoginScreenState extends State<LoginScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('[FirebaseAuth:${e.code}] ${e.message ?? 'Google sign-in failed'}'),
+          content: Text(
+              '[FirebaseAuth:${e.code}] ${e.message ?? 'Google sign-in failed'}'),
           backgroundColor: AppColors.lava,
         ),
       );
@@ -464,7 +481,8 @@ class _LoginScreenState extends State<LoginScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('[Platform:${e.code}] ${e.message ?? 'Platform error during Google sign-in'}'),
+          content: Text(
+              '[Platform:${e.code}] ${e.message ?? 'Platform error during Google sign-in'}'),
           backgroundColor: AppColors.lava,
         ),
       );

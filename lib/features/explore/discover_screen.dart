@@ -43,6 +43,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      resizeToAvoidBottomInset: true,
       appBar: AppBar(
         title: Text(
           'Discover',
@@ -54,18 +55,24 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
         elevation: 0,
         automaticallyImplyLeading: false,
       ),
-      body: Column(
-        children: [
-          // Search and filters section
-          _buildSearchSection(),
+      body: GestureDetector(
+        onTap: () {
+          // Dismiss keyboard when tapping outside
+          FocusScope.of(context).unfocus();
+        },
+        child: Column(
+          children: [
+            // Search and filters section
+            _buildSearchSection(),
 
-          // Experience list
-          Expanded(
-            child: _viewModel.isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : _buildExperienceList(),
-          ),
-        ],
+            // Experience list
+            Expanded(
+              child: _viewModel.isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : _buildExperienceList(),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -179,54 +186,61 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   }
 
   Widget _buildEmptyState() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              width: 80,
-              height: 80,
-              decoration: BoxDecoration(
-                color: AppColors.peach.withValues(alpha: 0.3),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.search_off,
-                size: 40,
-                color: AppColors.oliveGold,
-              ),
-            ),
-            const SizedBox(height: 24),
-            Text(
-              'No experiences found',
-              style: AppTypography.titleMedium.copyWith(
-                color: AppColors.textPrimary,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Try adjusting your search or filters to find more experiences.',
-              style: AppTypography.bodyMedium.copyWith(
-                color: AppColors.textSecondary,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 24),
-            TextButton(
-              onPressed: () {
-                _searchController.clear();
-                _viewModel.clearAllFilters();
-              },
-              child: Text(
-                'Clear all filters',
-                style: AppTypography.buttonMedium.copyWith(
-                  color: AppColors.forestGreen,
+    return SingleChildScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom,
+      ),
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 80,
+                height: 80,
+                decoration: BoxDecoration(
+                  color: AppColors.peach.withValues(alpha: 0.3),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.search_off,
+                  size: 40,
+                  color: AppColors.oliveGold,
                 ),
               ),
-            ),
-          ],
+              const SizedBox(height: 24),
+              Text(
+                'No experiences found',
+                style: AppTypography.titleMedium.copyWith(
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Try adjusting your search or filters to find more experiences.',
+                style: AppTypography.bodyMedium.copyWith(
+                  color: AppColors.textSecondary,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 24),
+              TextButton(
+                onPressed: () {
+                  _searchController.clear();
+                  _viewModel.clearAllFilters();
+                  FocusScope.of(context).unfocus();
+                },
+                child: Text(
+                  'Clear all filters',
+                  style: AppTypography.buttonMedium.copyWith(
+                    color: AppColors.forestGreen,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -244,7 +258,8 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
         selectedRegions: _viewModel.selectedRegions,
         selectedLanguages: _viewModel.selectedLanguages,
         minPrice: _viewModel.minPrice,
-        maxPrice: _viewModel.maxPrice == double.infinity ? 0 : _viewModel.maxPrice,
+        maxPrice:
+            _viewModel.maxPrice == double.infinity ? 0 : _viewModel.maxPrice,
         allExperiences: _viewModel.allExperiences,
         onApplyFilters: (categories, regions, languages, minPrice, maxPrice) {
           _viewModel.applyFilters(

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:travel_connect/models/experience.dart';
 import 'package:travel_connect/services/experience_service.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../../theme/colors.dart';
 import '../../theme/typography.dart';
 
@@ -21,7 +23,9 @@ class ExperienceDetailScreen extends StatefulWidget {
 class _ExperienceDetailScreenState extends State<ExperienceDetailScreen> {
   final ExperienceService _experienceService = ExperienceService();
   Experience? _experience;
+  Map<String, dynamic>? _hostData;
   bool _isLoading = true;
+  int _currentImageIndex = 0;
 
   @override
   void initState() {
@@ -33,8 +37,26 @@ class _ExperienceDetailScreenState extends State<ExperienceDetailScreen> {
     try {
       final experience =
           await _experienceService.getExperienceById(widget.experienceId);
+
+      // Fetch host data
+      Map<String, dynamic>? hostData;
+      if (experience != null) {
+        try {
+          final hostDoc = await FirebaseFirestore.instance
+              .collection('users')
+              .doc(experience.hostId)
+              .get();
+          if (hostDoc.exists) {
+            hostData = hostDoc.data();
+          }
+        } catch (e) {
+          debugPrint('Error fetching host data: $e');
+        }
+      }
+
       setState(() {
         _experience = experience;
+        _hostData = hostData;
         _isLoading = false;
       });
     } catch (e) {
@@ -79,8 +101,22 @@ class _ExperienceDetailScreenState extends State<ExperienceDetailScreen> {
                 // Title and rating section
                 _buildTitleSection(_experience!),
 
-                // Host section (assuming you have a way to get host data)
-                // _buildHostSection(_experience!),
+                // Photo gallery section
+                if (_experience!.images.length > 1)
+                  _buildPhotoGallery(_experience!),
+
+                // Price and details section
+                _buildPriceAndDetailsSection(_experience!),
+
+                // Host section
+                if (_hostData != null) _buildHostSection(_experience!),
+
+                // Location section
+                _buildLocationSection(_experience!),
+
+                // Categories section
+                if (_experience!.categories.isNotEmpty)
+                  _buildCategoriesSection(_experience!),
 
                 // About section
                 _buildAboutSection(_experience!),
@@ -97,6 +133,435 @@ class _ExperienceDetailScreenState extends State<ExperienceDetailScreen> {
 
       // Bottom action bar
       bottomNavigationBar: _buildBottomActions(context, _experience!),
+    );
+  }
+
+  /// Format price for display
+  String _formatPrice(int price) {
+    if (price >= 1000000) {
+      return '${(price / 1000000).toStringAsFixed(1)}M';
+    } else if (price >= 1000) {
+      return '${(price / 1000).toStringAsFixed(0)}K';
+    }
+    return price.toString();
+  }
+
+  Widget _buildPhotoGallery(Experience experience) {
+    if (experience.images.isEmpty) return const SizedBox.shrink();
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      height: 300,
+      child: Stack(
+        children: [
+          PageView.builder(
+            itemCount: experience.images.length,
+            onPageChanged: (index) {
+              setState(() {
+                _currentImageIndex = index;
+              });
+            },
+            itemBuilder: (context, index) {
+              return GestureDetector(
+                onTap: () =>
+                    _viewImageFullscreen(context, experience.images, index),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Image.network(
+                    experience.images[index],
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) {
+                      return Container(
+                        color: AppColors.peach.withValues(alpha: 0.3),
+                        child: const Center(
+                          child: Icon(
+                            Icons.broken_image,
+                            size: 48,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              );
+            },
+          ),
+          // Page indicators
+          Positioned(
+            bottom: 12,
+            left: 0,
+            right: 0,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: List.generate(
+                experience.images.length,
+                (index) => Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 4),
+                  width: 8,
+                  height: 8,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: _currentImageIndex == index
+                        ? AppColors.white
+                        : AppColors.white.withValues(alpha: 0.5),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _viewImageFullscreen(
+      BuildContext context, List<String> images, int initialIndex) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => _FullscreenImageViewer(
+          images: images,
+          initialIndex: initialIndex,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPriceAndDetailsSection(Experience experience) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.divider),
+      ),
+      child: Column(
+        children: [
+          // Price
+          Row(
+            children: [
+              const Icon(Icons.attach_money,
+                  color: AppColors.forestGreen, size: 20),
+              const SizedBox(width: 8),
+              Text(
+                'Price:',
+                style: AppTypography.labelLarge.copyWith(
+                  color: AppColors.textSecondary,
+                ),
+              ),
+              const Spacer(),
+              Text(
+                '${_formatPrice(experience.priceCOP)} COP',
+                style: AppTypography.titleSmall.copyWith(
+                  color: AppColors.forestGreen,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          const Divider(height: 24),
+          // Duration
+          Row(
+            children: [
+              const Icon(Icons.schedule,
+                  color: AppColors.textSecondary, size: 20),
+              const SizedBox(width: 8),
+              Text(
+                'Duration:',
+                style: AppTypography.labelLarge.copyWith(
+                  color: AppColors.textSecondary,
+                ),
+              ),
+              const Spacer(),
+              Text(
+                '${experience.duration} hours',
+                style: AppTypography.bodyLarge.copyWith(
+                  color: AppColors.textPrimary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+          const Divider(height: 24),
+          // Max group size
+          Row(
+            children: [
+              const Icon(Icons.group, color: AppColors.textSecondary, size: 20),
+              const SizedBox(width: 8),
+              Text(
+                'Max Group Size:',
+                style: AppTypography.labelLarge.copyWith(
+                  color: AppColors.textSecondary,
+                ),
+              ),
+              const Spacer(),
+              Text(
+                '${experience.groupSizeMax} people',
+                style: AppTypography.bodyLarge.copyWith(
+                  color: AppColors.textPrimary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+          // Reviews summary
+          if (experience.reviewsCount > 0) ...[
+            const Divider(height: 24),
+            InkWell(
+              onTap: () {
+                // TODO: Navigate to reviews section
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Reviews feature coming soon')),
+                );
+              },
+              child: Row(
+                children: [
+                  const Icon(Icons.star, color: AppColors.oliveGold, size: 20),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Reviews:',
+                    style: AppTypography.labelLarge.copyWith(
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                  const Spacer(),
+                  Text(
+                    '${experience.avgRating.toStringAsFixed(1)} ★',
+                    style: AppTypography.bodyLarge.copyWith(
+                      color: AppColors.oliveGold,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  Text(
+                    ' (${experience.reviewsCount})',
+                    style: AppTypography.bodyMedium.copyWith(
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  const Icon(Icons.chevron_right,
+                      color: AppColors.textSecondary, size: 20),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHostSection(Experience experience) {
+    if (_hostData == null) return const SizedBox.shrink();
+
+    final displayName = _hostData!['displayName'] as String? ?? 'Unknown Host';
+    final photoURL = _hostData!['photoURL'] as String?;
+    final isVerified = _hostData!['isVerified'] as bool? ?? false;
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.divider),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Hosted by',
+            style: AppTypography.titleSmall.copyWith(
+              color: AppColors.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              // Host avatar
+              CircleAvatar(
+                radius: 24,
+                backgroundImage: photoURL != null && photoURL.isNotEmpty
+                    ? NetworkImage(photoURL)
+                    : null,
+                backgroundColor: AppColors.forestGreen.withValues(alpha: 0.2),
+                child: photoURL == null || photoURL.isEmpty
+                    ? Text(
+                        displayName[0].toUpperCase(),
+                        style: AppTypography.titleMedium.copyWith(
+                          color: AppColors.forestGreen,
+                        ),
+                      )
+                    : null,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            displayName,
+                            style: AppTypography.bodyLarge.copyWith(
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.textPrimary,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        if (isVerified) ...[
+                          const SizedBox(width: 4),
+                          const Icon(
+                            Icons.verified,
+                            size: 16,
+                            color: AppColors.forestGreen,
+                          ),
+                        ],
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              // View profile button
+              OutlinedButton(
+                onPressed: () {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('User profiles coming soon!'),
+                      backgroundColor: AppColors.forestGreen,
+                      duration: Duration(seconds: 2),
+                    ),
+                  );
+                },
+                style: OutlinedButton.styleFrom(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                ),
+                child: const Text('View Profile'),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLocationSection(Experience experience) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.divider),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Location',
+            style: AppTypography.titleSmall.copyWith(
+              color: AppColors.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              const Icon(
+                Icons.location_on,
+                color: AppColors.lava,
+                size: 20,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  experience.department.isNotEmpty
+                      ? experience.department
+                      : 'Location not specified',
+                  style: AppTypography.bodyLarge.copyWith(
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          // Embedded map
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: SizedBox(
+              height: 200,
+              child: GoogleMap(
+                initialCameraPosition: CameraPosition(
+                  target: LatLng(
+                    experience.location.latitude,
+                    experience.location.longitude,
+                  ),
+                  zoom: 14.0,
+                ),
+                markers: {
+                  Marker(
+                    markerId: MarkerId(experience.id),
+                    position: LatLng(
+                      experience.location.latitude,
+                      experience.location.longitude,
+                    ),
+                    infoWindow: InfoWindow(
+                      title: experience.title,
+                    ),
+                  ),
+                },
+                zoomControlsEnabled: false,
+                scrollGesturesEnabled: false,
+                rotateGesturesEnabled: false,
+                tiltGesturesEnabled: false,
+                myLocationButtonEnabled: false,
+                mapToolbarEnabled: false,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCategoriesSection(Experience experience) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.divider),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Categories',
+            style: AppTypography.titleSmall.copyWith(
+              color: AppColors.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: experience.categories.map((category) {
+              return Chip(
+                label: Text(category),
+                backgroundColor: AppColors.peach.withValues(alpha: 0.3),
+                labelStyle: AppTypography.labelMedium.copyWith(
+                  color: AppColors.textPrimary,
+                ),
+                side: const BorderSide(color: AppColors.oliveGold),
+              );
+            }).toList(),
+          ),
+        ],
+      ),
     );
   }
 
@@ -389,7 +854,7 @@ class _ExperienceDetailScreenState extends State<ExperienceDetailScreen> {
               child: OutlinedButton.icon(
                 onPressed: () => _messageHost(context, experience.hostId),
                 icon: const Icon(Icons.message_outlined),
-                label: const Text('Message Host'),
+                label: const Text('Message'),
                 style: OutlinedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 12),
                 ),
@@ -400,11 +865,10 @@ class _ExperienceDetailScreenState extends State<ExperienceDetailScreen> {
 
             // Book Experience button
             Expanded(
-              flex: 2,
               child: ElevatedButton.icon(
                 onPressed: () => _bookExperience(context),
                 icon: const Icon(Icons.calendar_today),
-                label: const Text('Book Experience'),
+                label: const Text('Book'),
                 style: ElevatedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 12),
                 ),
@@ -422,5 +886,82 @@ class _ExperienceDetailScreenState extends State<ExperienceDetailScreen> {
 
   void _bookExperience(BuildContext context) {
     context.push('/booking/${widget.experienceId}');
+  }
+}
+
+/// Fullscreen image viewer with swipe navigation
+class _FullscreenImageViewer extends StatefulWidget {
+  const _FullscreenImageViewer({
+    required this.images,
+    required this.initialIndex,
+  });
+
+  final List<String> images;
+  final int initialIndex;
+
+  @override
+  State<_FullscreenImageViewer> createState() => _FullscreenImageViewerState();
+}
+
+class _FullscreenImageViewerState extends State<_FullscreenImageViewer> {
+  late PageController _pageController;
+  late int _currentIndex;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentIndex = widget.initialIndex;
+    _pageController = PageController(initialPage: widget.initialIndex);
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        backgroundColor: Colors.black,
+        iconTheme: const IconThemeData(color: Colors.white),
+        title: Text(
+          '${_currentIndex + 1} / ${widget.images.length}',
+          style: AppTypography.titleMedium.copyWith(color: Colors.white),
+        ),
+      ),
+      body: PageView.builder(
+        controller: _pageController,
+        itemCount: widget.images.length,
+        onPageChanged: (index) {
+          setState(() {
+            _currentIndex = index;
+          });
+        },
+        itemBuilder: (context, index) {
+          return InteractiveViewer(
+            minScale: 0.5,
+            maxScale: 4.0,
+            child: Center(
+              child: Image.network(
+                widget.images[index],
+                fit: BoxFit.contain,
+                errorBuilder: (context, error, stackTrace) {
+                  return const Center(
+                    child: Icon(
+                      Icons.broken_image,
+                      size: 64,
+                      color: Colors.white54,
+                    ),
+                  );
+                },
+              ),
+            ),
+          );
+        },
+      ),
+    );
   }
 }
