@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:travel_connect/models/experience.dart';
@@ -22,13 +23,18 @@ class ExperienceService {
               .toList();
         }
       } catch (e) {
-        // Cache might be empty or fail, which is fine.
         print('Could not fetch from cache: $e');
       }
     }
 
-    // 2. Then, try to get from server.
-    // This will update the cache for next time.
+    // 2. Check for internet connection.
+    final connectivityResult = await (Connectivity().checkConnectivity());
+    if (connectivityResult == ConnectivityResult.none) {
+      print('No internet connection. Returning cached experiences.');
+      return experiences;
+    }
+
+    // 3. If connected, try to get from server.
     try {
       final serverSnapshot = await _firestore.collection('experiences').get();
       if (serverSnapshot.docs.isNotEmpty) {
@@ -38,37 +44,44 @@ class ExperienceService {
       }
     } catch (e) {
       print('Could not fetch from server: $e');
-      // If server fails, we will rely on the cached data (if any).
     }
 
     return experiences;
   }
 
   Future<Experience?> getExperienceById(String id) async {
+    Experience? experience;
+    // 1. Try cache first
     try {
-      // Try cache first
-      try {
-        final doc = await _firestore
-            .collection('experiences')
-            .doc(id)
-            .get(const GetOptions(source: Source.cache));
-        if (doc.exists) {
-          return Experience.fromFirestore(doc);
-        }
-      } catch (e) {
-        print('Could not get experience $id from cache: $e');
+      final doc = await _firestore
+          .collection('experiences')
+          .doc(id)
+          .get(const GetOptions(source: Source.cache));
+      if (doc.exists) {
+        experience = Experience.fromFirestore(doc);
       }
+    } catch (e) {
+      print('Could not get experience $id from cache: $e');
+    }
 
-      // Then try server
+    // 2. Check for internet connection
+    final connectivityResult = await (Connectivity().checkConnectivity());
+    if (connectivityResult == ConnectivityResult.none) {
+      print('No internet connection. Returning cached experience for $id.');
+      return experience;
+    }
+
+    // 3. If connected, try server
+    try {
       DocumentSnapshot doc =
           await _firestore.collection('experiences').doc(id).get();
       if (doc.exists) {
-        return Experience.fromFirestore(doc);
+        experience = Experience.fromFirestore(doc);
       }
     } catch (e) {
-      print(e);
+      print('Could not fetch experience $id from server: $e');
     }
-    return null;
+    return experience;
   }
 
   /// Stream the current user's experiences using the same host reference rule
