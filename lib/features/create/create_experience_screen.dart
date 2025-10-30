@@ -35,6 +35,7 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
   List<String> _selectedCategories = [];
   List<String> _selectedLanguages = [];
   List<String> _selectedPaymentOptions = [];
+  List<String> _selectedAccessibilityFeatures = [];
   final List<String> _imageUrls = [];
   final List<File> _localPhotos = [];
   GeoPoint? _selectedGeoPoint;
@@ -44,6 +45,16 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
 
   static const List<String> _languageOptions = ['es', 'en', 'pt', 'fr'];
   static const List<String> _paymentOptions = ['cash', 'card'];
+  static const List<String> _accessibilityOptions = [
+    'Wheelchair Access',
+    'Elevator',
+    'Accessible Parking',
+    'Accessible Restroom',
+    'Ramps',
+    'Braille Signage',
+    'Audio Guide',
+    'Service Animals Allowed'
+  ];
   static const String _placesApiKey = String.fromEnvironment(
       'GOOGLE_PLACES_API_KEY',
       defaultValue: 'AIzaSyA0TPkWq9uNvEA0Qhw2NVBihLbRTroYabE');
@@ -346,6 +357,22 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
             ),
 
             const SizedBox(height: 20),
+
+            // Accessibility Features
+            _buildChipsSection(
+              label: 'Accessibility Features',
+              options: _accessibilityOptions,
+              selected: _selectedAccessibilityFeatures,
+              onToggle: (value) {
+                setState(() {
+                  if (_selectedAccessibilityFeatures.contains(value)) {
+                    _selectedAccessibilityFeatures.remove(value);
+                  } else {
+                    _selectedAccessibilityFeatures.add(value);
+                  }
+                });
+              },
+            ),
 
             const SizedBox(height: 32),
           ],
@@ -840,6 +867,7 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
         'languages': _selectedLanguages,
         'images': _imageUrls,
         'isActive': true,
+        'accessibilityFeatures': _selectedAccessibilityFeatures,
         'location': _selectedGeoPoint,
         'skillsToTeach': skillsToTeach.isEmpty
             ? <String>[_skillsToTeachController.text.trim()]

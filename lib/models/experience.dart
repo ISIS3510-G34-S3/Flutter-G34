@@ -21,6 +21,7 @@ class Experience {
   final List<String> paymentOptions;
   final List<String> images;
   final bool isActive;
+  final List<String> accessibilityFeatures;
 
   const Experience({
     required this.id,
@@ -43,6 +44,7 @@ class Experience {
     required this.paymentOptions,
     required this.images,
     required this.isActive,
+    required this.accessibilityFeatures,
   });
 
   factory Experience.fromFirestore(DocumentSnapshot doc) {
@@ -113,6 +115,7 @@ class Experience {
       paymentOptions: parseStringList(data['paymentOptions'], 'paymentOptions'),
       images: parseStringList(data['images'], 'images'),
       isActive: parseBool(data['isActive'], false),
+      accessibilityFeatures: parseStringList(data['accessibilityFeatures'], 'accessibilityFeatures'),
     );
   }
 }

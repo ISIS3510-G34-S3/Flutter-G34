@@ -47,3 +47,9 @@ app.*.map.json
 .cc
 .kts
 .cmake
+
+#Ignore the pubspec.lock file, build.gradle.kts, and app.gradle.kts files
+build.gradle.kts
+pubspec.lock
+generated_plugin_registrant.java
+generated_plugins.cmake

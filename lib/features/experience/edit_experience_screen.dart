@@ -36,6 +36,7 @@ class _EditExperienceScreenState extends State<EditExperienceScreen> {
   List<String> _selectedCategories = [];
   List<String> _selectedLanguages = [];
   List<String> _selectedPaymentOptions = [];
+  List<String> _selectedAccessibilityFeatures = [];
   final List<String> _imageUrls = [];
 
   GeoPoint? _geoPoint;
@@ -63,6 +64,7 @@ class _EditExperienceScreenState extends State<EditExperienceScreen> {
       _selectedCategories = List<String>.from(exp.categories);
       _selectedLanguages = List<String>.from(exp.languages);
       _selectedPaymentOptions = List<String>.from(exp.paymentOptions);
+      _selectedAccessibilityFeatures = List<String>.from(exp.accessibilityFeatures);
       _imageUrls.addAll(exp.images);
       _geoPoint = exp.location;
       _department = exp.department;
@@ -145,6 +147,7 @@ class _EditExperienceScreenState extends State<EditExperienceScreen> {
       'categories': _selectedCategories,
       'languages': _selectedLanguages,
       'paymentOptions': _selectedPaymentOptions,
+      'accessibilityFeatures': _selectedAccessibilityFeatures,
       'images': _imageUrls,
       'department': _department ?? '',
       'location': _geoPoint,
@@ -266,6 +269,30 @@ class _EditExperienceScreenState extends State<EditExperienceScreen> {
                           _selectedPaymentOptions.remove(value);
                         } else {
                           _selectedPaymentOptions.add(value);
+                        }
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 20),
+                  _buildChipsSection(
+                    label: 'Accessibility Features',
+                    options: const [
+                      'Wheelchair Access',
+                      'Elevator',
+                      'Accessible Parking',
+                      'Accessible Restroom',
+                      'Ramps',
+                      'Braille Signage',
+                      'Audio Guide',
+                      'Service Animals Allowed'
+                    ],
+                    selected: _selectedAccessibilityFeatures,
+                    onToggle: (value) {
+                      setState(() {
+                        if (_selectedAccessibilityFeatures.contains(value)) {
+                          _selectedAccessibilityFeatures.remove(value);
+                        } else {
+                          _selectedAccessibilityFeatures.add(value);
                         }
                       });
                     },
