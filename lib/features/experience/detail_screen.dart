@@ -5,7 +5,6 @@ import 'package:go_router/go_router.dart';
 import 'package:travel_connect/models/experience.dart';
 import 'package:travel_connect/services/experience_service.dart';
 import 'package:travel_connect/services/host_service.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../../theme/colors.dart';
 import '../../theme/typography.dart';
@@ -433,7 +432,7 @@ class _ExperienceDetailScreenState extends State<ExperienceDetailScreen> {
               // View profile button
               OutlinedButton(
                 onPressed: () {
-                  context.push('/profile/${host.id}');
+                  context.push('/host/${host.id}');
                 },
                 style: OutlinedButton.styleFrom(
                   padding:

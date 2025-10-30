@@ -15,6 +15,7 @@ import '../features/chatbot/chatbot_screen.dart';
 import '../widgets/main_scaffold.dart';
 import '../features/experience/my_experiences_screen.dart';
 import '../features/experience/edit_experience_screen.dart';
+import '../features/profile/host_screen.dart';
 
 /// Auth state notifier to make router reactive to auth changes
 class AuthNotifier extends ChangeNotifier {
@@ -92,6 +93,16 @@ final GoRouter appRouter = GoRouter(
           path: '/my-experiences',
           name: 'my-experiences',
           builder: (context, state) => const MyExperiencesScreen(),
+        ),
+
+        // Host screen
+        GoRoute(
+          path: '/host/:id',
+          name: 'host',
+          builder: (context, state) {
+            final hostId = state.pathParameters['id']!;
+            return HostScreen(hostId: hostId);
+          },
         ),
 
         // Profile route
