@@ -12,6 +12,7 @@ class Host {
   final String about;
   final int hostedExperiences;
   final int joinedExperiences;
+  final String? photoURL;
 
   const Host({
     required this.id,
@@ -25,6 +26,7 @@ class Host {
     required this.about,
     required this.hostedExperiences,
     required this.joinedExperiences,
+    this.photoURL,
   });
 
   factory Host.fromFirestore(DocumentSnapshot doc) {
@@ -59,6 +61,7 @@ class Host {
       about: data['about'] ?? 'Tell others about yourself.',
       hostedExperiences: data['hostedExperiences'] ?? 0,
       joinedExperiences: data['joinedExperiences'] ?? 0,
+      photoURL: data['photoURL'] as String?,
     );
   }
 }
