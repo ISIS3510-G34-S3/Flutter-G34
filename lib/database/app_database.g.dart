@@ -104,6 +104,25 @@ class $ExperiencesTable extends Experiences
   late final GeneratedColumn<String> languages = GeneratedColumn<String>(
       'languages', aliasedName, false,
       type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _paymentOptionsMeta =
+      const VerificationMeta('paymentOptions');
+  @override
+  late final GeneratedColumn<String> paymentOptions = GeneratedColumn<String>(
+      'payment_options', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _imagesMeta = const VerificationMeta('images');
+  @override
+  late final GeneratedColumn<String> images = GeneratedColumn<String>(
+      'images', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _accessibilityFeaturesMeta =
+      const VerificationMeta('accessibilityFeatures');
+  @override
+  late final GeneratedColumn<String> accessibilityFeatures =
+      GeneratedColumn<String>('accessibility_features', aliasedName, false,
+          type: DriftSqlType.string,
+          requiredDuringInsert: false,
+          defaultValue: const Constant('[]'));
   static const VerificationMeta _createdAtMeta =
       const VerificationMeta('createdAt');
   @override
@@ -122,17 +141,6 @@ class $ExperiencesTable extends Experiences
   late final GeneratedColumn<int> groupSizeMax = GeneratedColumn<int>(
       'group_size_max', aliasedName, false,
       type: DriftSqlType.int, requiredDuringInsert: true);
-  static const VerificationMeta _paymentOptionsMeta =
-      const VerificationMeta('paymentOptions');
-  @override
-  late final GeneratedColumn<String> paymentOptions = GeneratedColumn<String>(
-      'payment_options', aliasedName, false,
-      type: DriftSqlType.string, requiredDuringInsert: true);
-  static const VerificationMeta _imagesMeta = const VerificationMeta('images');
-  @override
-  late final GeneratedColumn<String> images = GeneratedColumn<String>(
-      'images', aliasedName, false,
-      type: DriftSqlType.string, requiredDuringInsert: true);
   static const VerificationMeta _isActiveMeta =
       const VerificationMeta('isActive');
   @override
@@ -176,11 +184,12 @@ class $ExperiencesTable extends Experiences
         skillsToTeach,
         categories,
         languages,
+        paymentOptions,
+        images,
+        accessibilityFeatures,
         createdAt,
         priceCOP,
         groupSizeMax,
-        paymentOptions,
-        images,
         isActive,
         lastSyncedAt,
         isDirty
@@ -294,6 +303,26 @@ class $ExperiencesTable extends Experiences
     } else if (isInserting) {
       context.missing(_languagesMeta);
     }
+    if (data.containsKey('payment_options')) {
+      context.handle(
+          _paymentOptionsMeta,
+          paymentOptions.isAcceptableOrUnknown(
+              data['payment_options']!, _paymentOptionsMeta));
+    } else if (isInserting) {
+      context.missing(_paymentOptionsMeta);
+    }
+    if (data.containsKey('images')) {
+      context.handle(_imagesMeta,
+          images.isAcceptableOrUnknown(data['images']!, _imagesMeta));
+    } else if (isInserting) {
+      context.missing(_imagesMeta);
+    }
+    if (data.containsKey('accessibility_features')) {
+      context.handle(
+          _accessibilityFeaturesMeta,
+          accessibilityFeatures.isAcceptableOrUnknown(
+              data['accessibility_features']!, _accessibilityFeaturesMeta));
+    }
     if (data.containsKey('created_at')) {
       context.handle(_createdAtMeta,
           createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta));
@@ -313,20 +342,6 @@ class $ExperiencesTable extends Experiences
               data['group_size_max']!, _groupSizeMaxMeta));
     } else if (isInserting) {
       context.missing(_groupSizeMaxMeta);
-    }
-    if (data.containsKey('payment_options')) {
-      context.handle(
-          _paymentOptionsMeta,
-          paymentOptions.isAcceptableOrUnknown(
-              data['payment_options']!, _paymentOptionsMeta));
-    } else if (isInserting) {
-      context.missing(_paymentOptionsMeta);
-    }
-    if (data.containsKey('images')) {
-      context.handle(_imagesMeta,
-          images.isAcceptableOrUnknown(data['images']!, _imagesMeta));
-    } else if (isInserting) {
-      context.missing(_imagesMeta);
     }
     if (data.containsKey('is_active')) {
       context.handle(_isActiveMeta,
@@ -381,16 +396,19 @@ class $ExperiencesTable extends Experiences
           .read(DriftSqlType.string, data['${effectivePrefix}categories'])!,
       languages: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}languages'])!,
+      paymentOptions: attachedDatabase.typeMapping.read(
+          DriftSqlType.string, data['${effectivePrefix}payment_options'])!,
+      images: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}images'])!,
+      accessibilityFeatures: attachedDatabase.typeMapping.read(
+          DriftSqlType.string,
+          data['${effectivePrefix}accessibility_features'])!,
       createdAt: attachedDatabase.typeMapping
           .read(DriftSqlType.dateTime, data['${effectivePrefix}created_at'])!,
       priceCOP: attachedDatabase.typeMapping
           .read(DriftSqlType.int, data['${effectivePrefix}price_c_o_p'])!,
       groupSizeMax: attachedDatabase.typeMapping
           .read(DriftSqlType.int, data['${effectivePrefix}group_size_max'])!,
-      paymentOptions: attachedDatabase.typeMapping.read(
-          DriftSqlType.string, data['${effectivePrefix}payment_options'])!,
-      images: attachedDatabase.typeMapping
-          .read(DriftSqlType.string, data['${effectivePrefix}images'])!,
       isActive: attachedDatabase.typeMapping
           .read(DriftSqlType.bool, data['${effectivePrefix}is_active'])!,
       lastSyncedAt: attachedDatabase.typeMapping.read(
@@ -422,11 +440,12 @@ class Experience extends DataClass implements Insertable<Experience> {
   final String skillsToTeach;
   final String categories;
   final String languages;
+  final String paymentOptions;
+  final String images;
+  final String accessibilityFeatures;
   final DateTime createdAt;
   final int priceCOP;
   final int groupSizeMax;
-  final String paymentOptions;
-  final String images;
   final bool isActive;
   final DateTime? lastSyncedAt;
   final bool isDirty;
@@ -446,11 +465,12 @@ class Experience extends DataClass implements Insertable<Experience> {
       required this.skillsToTeach,
       required this.categories,
       required this.languages,
+      required this.paymentOptions,
+      required this.images,
+      required this.accessibilityFeatures,
       required this.createdAt,
       required this.priceCOP,
       required this.groupSizeMax,
-      required this.paymentOptions,
-      required this.images,
       required this.isActive,
       this.lastSyncedAt,
       required this.isDirty});
@@ -472,11 +492,12 @@ class Experience extends DataClass implements Insertable<Experience> {
     map['skills_to_teach'] = Variable<String>(skillsToTeach);
     map['categories'] = Variable<String>(categories);
     map['languages'] = Variable<String>(languages);
+    map['payment_options'] = Variable<String>(paymentOptions);
+    map['images'] = Variable<String>(images);
+    map['accessibility_features'] = Variable<String>(accessibilityFeatures);
     map['created_at'] = Variable<DateTime>(createdAt);
     map['price_c_o_p'] = Variable<int>(priceCOP);
     map['group_size_max'] = Variable<int>(groupSizeMax);
-    map['payment_options'] = Variable<String>(paymentOptions);
-    map['images'] = Variable<String>(images);
     map['is_active'] = Variable<bool>(isActive);
     if (!nullToAbsent || lastSyncedAt != null) {
       map['last_synced_at'] = Variable<DateTime>(lastSyncedAt);
@@ -502,11 +523,12 @@ class Experience extends DataClass implements Insertable<Experience> {
       skillsToTeach: Value(skillsToTeach),
       categories: Value(categories),
       languages: Value(languages),
+      paymentOptions: Value(paymentOptions),
+      images: Value(images),
+      accessibilityFeatures: Value(accessibilityFeatures),
       createdAt: Value(createdAt),
       priceCOP: Value(priceCOP),
       groupSizeMax: Value(groupSizeMax),
-      paymentOptions: Value(paymentOptions),
-      images: Value(images),
       isActive: Value(isActive),
       lastSyncedAt: lastSyncedAt == null && nullToAbsent
           ? const Value.absent()
@@ -534,11 +556,13 @@ class Experience extends DataClass implements Insertable<Experience> {
       skillsToTeach: serializer.fromJson<String>(json['skillsToTeach']),
       categories: serializer.fromJson<String>(json['categories']),
       languages: serializer.fromJson<String>(json['languages']),
+      paymentOptions: serializer.fromJson<String>(json['paymentOptions']),
+      images: serializer.fromJson<String>(json['images']),
+      accessibilityFeatures:
+          serializer.fromJson<String>(json['accessibilityFeatures']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       priceCOP: serializer.fromJson<int>(json['priceCOP']),
       groupSizeMax: serializer.fromJson<int>(json['groupSizeMax']),
-      paymentOptions: serializer.fromJson<String>(json['paymentOptions']),
-      images: serializer.fromJson<String>(json['images']),
       isActive: serializer.fromJson<bool>(json['isActive']),
       lastSyncedAt: serializer.fromJson<DateTime?>(json['lastSyncedAt']),
       isDirty: serializer.fromJson<bool>(json['isDirty']),
@@ -563,11 +587,12 @@ class Experience extends DataClass implements Insertable<Experience> {
       'skillsToTeach': serializer.toJson<String>(skillsToTeach),
       'categories': serializer.toJson<String>(categories),
       'languages': serializer.toJson<String>(languages),
+      'paymentOptions': serializer.toJson<String>(paymentOptions),
+      'images': serializer.toJson<String>(images),
+      'accessibilityFeatures': serializer.toJson<String>(accessibilityFeatures),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'priceCOP': serializer.toJson<int>(priceCOP),
       'groupSizeMax': serializer.toJson<int>(groupSizeMax),
-      'paymentOptions': serializer.toJson<String>(paymentOptions),
-      'images': serializer.toJson<String>(images),
       'isActive': serializer.toJson<bool>(isActive),
       'lastSyncedAt': serializer.toJson<DateTime?>(lastSyncedAt),
       'isDirty': serializer.toJson<bool>(isDirty),
@@ -590,11 +615,12 @@ class Experience extends DataClass implements Insertable<Experience> {
           String? skillsToTeach,
           String? categories,
           String? languages,
+          String? paymentOptions,
+          String? images,
+          String? accessibilityFeatures,
           DateTime? createdAt,
           int? priceCOP,
           int? groupSizeMax,
-          String? paymentOptions,
-          String? images,
           bool? isActive,
           Value<DateTime?> lastSyncedAt = const Value.absent(),
           bool? isDirty}) =>
@@ -614,11 +640,13 @@ class Experience extends DataClass implements Insertable<Experience> {
         skillsToTeach: skillsToTeach ?? this.skillsToTeach,
         categories: categories ?? this.categories,
         languages: languages ?? this.languages,
+        paymentOptions: paymentOptions ?? this.paymentOptions,
+        images: images ?? this.images,
+        accessibilityFeatures:
+            accessibilityFeatures ?? this.accessibilityFeatures,
         createdAt: createdAt ?? this.createdAt,
         priceCOP: priceCOP ?? this.priceCOP,
         groupSizeMax: groupSizeMax ?? this.groupSizeMax,
-        paymentOptions: paymentOptions ?? this.paymentOptions,
-        images: images ?? this.images,
         isActive: isActive ?? this.isActive,
         lastSyncedAt:
             lastSyncedAt.present ? lastSyncedAt.value : this.lastSyncedAt,
@@ -653,15 +681,18 @@ class Experience extends DataClass implements Insertable<Experience> {
       categories:
           data.categories.present ? data.categories.value : this.categories,
       languages: data.languages.present ? data.languages.value : this.languages,
+      paymentOptions: data.paymentOptions.present
+          ? data.paymentOptions.value
+          : this.paymentOptions,
+      images: data.images.present ? data.images.value : this.images,
+      accessibilityFeatures: data.accessibilityFeatures.present
+          ? data.accessibilityFeatures.value
+          : this.accessibilityFeatures,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       priceCOP: data.priceCOP.present ? data.priceCOP.value : this.priceCOP,
       groupSizeMax: data.groupSizeMax.present
           ? data.groupSizeMax.value
           : this.groupSizeMax,
-      paymentOptions: data.paymentOptions.present
-          ? data.paymentOptions.value
-          : this.paymentOptions,
-      images: data.images.present ? data.images.value : this.images,
       isActive: data.isActive.present ? data.isActive.value : this.isActive,
       lastSyncedAt: data.lastSyncedAt.present
           ? data.lastSyncedAt.value
@@ -688,11 +719,12 @@ class Experience extends DataClass implements Insertable<Experience> {
           ..write('skillsToTeach: $skillsToTeach, ')
           ..write('categories: $categories, ')
           ..write('languages: $languages, ')
+          ..write('paymentOptions: $paymentOptions, ')
+          ..write('images: $images, ')
+          ..write('accessibilityFeatures: $accessibilityFeatures, ')
           ..write('createdAt: $createdAt, ')
           ..write('priceCOP: $priceCOP, ')
           ..write('groupSizeMax: $groupSizeMax, ')
-          ..write('paymentOptions: $paymentOptions, ')
-          ..write('images: $images, ')
           ..write('isActive: $isActive, ')
           ..write('lastSyncedAt: $lastSyncedAt, ')
           ..write('isDirty: $isDirty')
@@ -717,11 +749,12 @@ class Experience extends DataClass implements Insertable<Experience> {
         skillsToTeach,
         categories,
         languages,
+        paymentOptions,
+        images,
+        accessibilityFeatures,
         createdAt,
         priceCOP,
         groupSizeMax,
-        paymentOptions,
-        images,
         isActive,
         lastSyncedAt,
         isDirty
@@ -745,11 +778,12 @@ class Experience extends DataClass implements Insertable<Experience> {
           other.skillsToTeach == this.skillsToTeach &&
           other.categories == this.categories &&
           other.languages == this.languages &&
+          other.paymentOptions == this.paymentOptions &&
+          other.images == this.images &&
+          other.accessibilityFeatures == this.accessibilityFeatures &&
           other.createdAt == this.createdAt &&
           other.priceCOP == this.priceCOP &&
           other.groupSizeMax == this.groupSizeMax &&
-          other.paymentOptions == this.paymentOptions &&
-          other.images == this.images &&
           other.isActive == this.isActive &&
           other.lastSyncedAt == this.lastSyncedAt &&
           other.isDirty == this.isDirty);
@@ -771,11 +805,12 @@ class ExperiencesCompanion extends UpdateCompanion<Experience> {
   final Value<String> skillsToTeach;
   final Value<String> categories;
   final Value<String> languages;
+  final Value<String> paymentOptions;
+  final Value<String> images;
+  final Value<String> accessibilityFeatures;
   final Value<DateTime> createdAt;
   final Value<int> priceCOP;
   final Value<int> groupSizeMax;
-  final Value<String> paymentOptions;
-  final Value<String> images;
   final Value<bool> isActive;
   final Value<DateTime?> lastSyncedAt;
   final Value<bool> isDirty;
@@ -796,11 +831,12 @@ class ExperiencesCompanion extends UpdateCompanion<Experience> {
     this.skillsToTeach = const Value.absent(),
     this.categories = const Value.absent(),
     this.languages = const Value.absent(),
+    this.paymentOptions = const Value.absent(),
+    this.images = const Value.absent(),
+    this.accessibilityFeatures = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.priceCOP = const Value.absent(),
     this.groupSizeMax = const Value.absent(),
-    this.paymentOptions = const Value.absent(),
-    this.images = const Value.absent(),
     this.isActive = const Value.absent(),
     this.lastSyncedAt = const Value.absent(),
     this.isDirty = const Value.absent(),
@@ -822,11 +858,12 @@ class ExperiencesCompanion extends UpdateCompanion<Experience> {
     required String skillsToTeach,
     required String categories,
     required String languages,
+    required String paymentOptions,
+    required String images,
+    this.accessibilityFeatures = const Value.absent(),
     required DateTime createdAt,
     required int priceCOP,
     required int groupSizeMax,
-    required String paymentOptions,
-    required String images,
     this.isActive = const Value.absent(),
     this.lastSyncedAt = const Value.absent(),
     this.isDirty = const Value.absent(),
@@ -843,11 +880,11 @@ class ExperiencesCompanion extends UpdateCompanion<Experience> {
         skillsToTeach = Value(skillsToTeach),
         categories = Value(categories),
         languages = Value(languages),
+        paymentOptions = Value(paymentOptions),
+        images = Value(images),
         createdAt = Value(createdAt),
         priceCOP = Value(priceCOP),
-        groupSizeMax = Value(groupSizeMax),
-        paymentOptions = Value(paymentOptions),
-        images = Value(images);
+        groupSizeMax = Value(groupSizeMax);
   static Insertable<Experience> custom({
     Expression<String>? id,
     Expression<String>? title,
@@ -864,11 +901,12 @@ class ExperiencesCompanion extends UpdateCompanion<Experience> {
     Expression<String>? skillsToTeach,
     Expression<String>? categories,
     Expression<String>? languages,
+    Expression<String>? paymentOptions,
+    Expression<String>? images,
+    Expression<String>? accessibilityFeatures,
     Expression<DateTime>? createdAt,
     Expression<int>? priceCOP,
     Expression<int>? groupSizeMax,
-    Expression<String>? paymentOptions,
-    Expression<String>? images,
     Expression<bool>? isActive,
     Expression<DateTime>? lastSyncedAt,
     Expression<bool>? isDirty,
@@ -890,11 +928,13 @@ class ExperiencesCompanion extends UpdateCompanion<Experience> {
       if (skillsToTeach != null) 'skills_to_teach': skillsToTeach,
       if (categories != null) 'categories': categories,
       if (languages != null) 'languages': languages,
+      if (paymentOptions != null) 'payment_options': paymentOptions,
+      if (images != null) 'images': images,
+      if (accessibilityFeatures != null)
+        'accessibility_features': accessibilityFeatures,
       if (createdAt != null) 'created_at': createdAt,
       if (priceCOP != null) 'price_c_o_p': priceCOP,
       if (groupSizeMax != null) 'group_size_max': groupSizeMax,
-      if (paymentOptions != null) 'payment_options': paymentOptions,
-      if (images != null) 'images': images,
       if (isActive != null) 'is_active': isActive,
       if (lastSyncedAt != null) 'last_synced_at': lastSyncedAt,
       if (isDirty != null) 'is_dirty': isDirty,
@@ -918,11 +958,12 @@ class ExperiencesCompanion extends UpdateCompanion<Experience> {
       Value<String>? skillsToTeach,
       Value<String>? categories,
       Value<String>? languages,
+      Value<String>? paymentOptions,
+      Value<String>? images,
+      Value<String>? accessibilityFeatures,
       Value<DateTime>? createdAt,
       Value<int>? priceCOP,
       Value<int>? groupSizeMax,
-      Value<String>? paymentOptions,
-      Value<String>? images,
       Value<bool>? isActive,
       Value<DateTime?>? lastSyncedAt,
       Value<bool>? isDirty,
@@ -943,11 +984,13 @@ class ExperiencesCompanion extends UpdateCompanion<Experience> {
       skillsToTeach: skillsToTeach ?? this.skillsToTeach,
       categories: categories ?? this.categories,
       languages: languages ?? this.languages,
+      paymentOptions: paymentOptions ?? this.paymentOptions,
+      images: images ?? this.images,
+      accessibilityFeatures:
+          accessibilityFeatures ?? this.accessibilityFeatures,
       createdAt: createdAt ?? this.createdAt,
       priceCOP: priceCOP ?? this.priceCOP,
       groupSizeMax: groupSizeMax ?? this.groupSizeMax,
-      paymentOptions: paymentOptions ?? this.paymentOptions,
-      images: images ?? this.images,
       isActive: isActive ?? this.isActive,
       lastSyncedAt: lastSyncedAt ?? this.lastSyncedAt,
       isDirty: isDirty ?? this.isDirty,
@@ -1003,6 +1046,16 @@ class ExperiencesCompanion extends UpdateCompanion<Experience> {
     if (languages.present) {
       map['languages'] = Variable<String>(languages.value);
     }
+    if (paymentOptions.present) {
+      map['payment_options'] = Variable<String>(paymentOptions.value);
+    }
+    if (images.present) {
+      map['images'] = Variable<String>(images.value);
+    }
+    if (accessibilityFeatures.present) {
+      map['accessibility_features'] =
+          Variable<String>(accessibilityFeatures.value);
+    }
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
@@ -1011,12 +1064,6 @@ class ExperiencesCompanion extends UpdateCompanion<Experience> {
     }
     if (groupSizeMax.present) {
       map['group_size_max'] = Variable<int>(groupSizeMax.value);
-    }
-    if (paymentOptions.present) {
-      map['payment_options'] = Variable<String>(paymentOptions.value);
-    }
-    if (images.present) {
-      map['images'] = Variable<String>(images.value);
     }
     if (isActive.present) {
       map['is_active'] = Variable<bool>(isActive.value);
@@ -1051,11 +1098,12 @@ class ExperiencesCompanion extends UpdateCompanion<Experience> {
           ..write('skillsToTeach: $skillsToTeach, ')
           ..write('categories: $categories, ')
           ..write('languages: $languages, ')
+          ..write('paymentOptions: $paymentOptions, ')
+          ..write('images: $images, ')
+          ..write('accessibilityFeatures: $accessibilityFeatures, ')
           ..write('createdAt: $createdAt, ')
           ..write('priceCOP: $priceCOP, ')
           ..write('groupSizeMax: $groupSizeMax, ')
-          ..write('paymentOptions: $paymentOptions, ')
-          ..write('images: $images, ')
           ..write('isActive: $isActive, ')
           ..write('lastSyncedAt: $lastSyncedAt, ')
           ..write('isDirty: $isDirty, ')
@@ -1787,11 +1835,12 @@ typedef $$ExperiencesTableCreateCompanionBuilder = ExperiencesCompanion
   required String skillsToTeach,
   required String categories,
   required String languages,
+  required String paymentOptions,
+  required String images,
+  Value<String> accessibilityFeatures,
   required DateTime createdAt,
   required int priceCOP,
   required int groupSizeMax,
-  required String paymentOptions,
-  required String images,
   Value<bool> isActive,
   Value<DateTime?> lastSyncedAt,
   Value<bool> isDirty,
@@ -1814,11 +1863,12 @@ typedef $$ExperiencesTableUpdateCompanionBuilder = ExperiencesCompanion
   Value<String> skillsToTeach,
   Value<String> categories,
   Value<String> languages,
+  Value<String> paymentOptions,
+  Value<String> images,
+  Value<String> accessibilityFeatures,
   Value<DateTime> createdAt,
   Value<int> priceCOP,
   Value<int> groupSizeMax,
-  Value<String> paymentOptions,
-  Value<String> images,
   Value<bool> isActive,
   Value<DateTime?> lastSyncedAt,
   Value<bool> isDirty,
@@ -1879,6 +1929,17 @@ class $$ExperiencesTableFilterComposer
   ColumnFilters<String> get languages => $composableBuilder(
       column: $table.languages, builder: (column) => ColumnFilters(column));
 
+  ColumnFilters<String> get paymentOptions => $composableBuilder(
+      column: $table.paymentOptions,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get images => $composableBuilder(
+      column: $table.images, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get accessibilityFeatures => $composableBuilder(
+      column: $table.accessibilityFeatures,
+      builder: (column) => ColumnFilters(column));
+
   ColumnFilters<DateTime> get createdAt => $composableBuilder(
       column: $table.createdAt, builder: (column) => ColumnFilters(column));
 
@@ -1887,13 +1948,6 @@ class $$ExperiencesTableFilterComposer
 
   ColumnFilters<int> get groupSizeMax => $composableBuilder(
       column: $table.groupSizeMax, builder: (column) => ColumnFilters(column));
-
-  ColumnFilters<String> get paymentOptions => $composableBuilder(
-      column: $table.paymentOptions,
-      builder: (column) => ColumnFilters(column));
-
-  ColumnFilters<String> get images => $composableBuilder(
-      column: $table.images, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<bool> get isActive => $composableBuilder(
       column: $table.isActive, builder: (column) => ColumnFilters(column));
@@ -1963,6 +2017,17 @@ class $$ExperiencesTableOrderingComposer
   ColumnOrderings<String> get languages => $composableBuilder(
       column: $table.languages, builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<String> get paymentOptions => $composableBuilder(
+      column: $table.paymentOptions,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get images => $composableBuilder(
+      column: $table.images, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get accessibilityFeatures => $composableBuilder(
+      column: $table.accessibilityFeatures,
+      builder: (column) => ColumnOrderings(column));
+
   ColumnOrderings<DateTime> get createdAt => $composableBuilder(
       column: $table.createdAt, builder: (column) => ColumnOrderings(column));
 
@@ -1972,13 +2037,6 @@ class $$ExperiencesTableOrderingComposer
   ColumnOrderings<int> get groupSizeMax => $composableBuilder(
       column: $table.groupSizeMax,
       builder: (column) => ColumnOrderings(column));
-
-  ColumnOrderings<String> get paymentOptions => $composableBuilder(
-      column: $table.paymentOptions,
-      builder: (column) => ColumnOrderings(column));
-
-  ColumnOrderings<String> get images => $composableBuilder(
-      column: $table.images, builder: (column) => ColumnOrderings(column));
 
   ColumnOrderings<bool> get isActive => $composableBuilder(
       column: $table.isActive, builder: (column) => ColumnOrderings(column));
@@ -2045,6 +2103,15 @@ class $$ExperiencesTableAnnotationComposer
   GeneratedColumn<String> get languages =>
       $composableBuilder(column: $table.languages, builder: (column) => column);
 
+  GeneratedColumn<String> get paymentOptions => $composableBuilder(
+      column: $table.paymentOptions, builder: (column) => column);
+
+  GeneratedColumn<String> get images =>
+      $composableBuilder(column: $table.images, builder: (column) => column);
+
+  GeneratedColumn<String> get accessibilityFeatures => $composableBuilder(
+      column: $table.accessibilityFeatures, builder: (column) => column);
+
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
 
@@ -2053,12 +2120,6 @@ class $$ExperiencesTableAnnotationComposer
 
   GeneratedColumn<int> get groupSizeMax => $composableBuilder(
       column: $table.groupSizeMax, builder: (column) => column);
-
-  GeneratedColumn<String> get paymentOptions => $composableBuilder(
-      column: $table.paymentOptions, builder: (column) => column);
-
-  GeneratedColumn<String> get images =>
-      $composableBuilder(column: $table.images, builder: (column) => column);
 
   GeneratedColumn<bool> get isActive =>
       $composableBuilder(column: $table.isActive, builder: (column) => column);
@@ -2108,11 +2169,12 @@ class $$ExperiencesTableTableManager extends RootTableManager<
             Value<String> skillsToTeach = const Value.absent(),
             Value<String> categories = const Value.absent(),
             Value<String> languages = const Value.absent(),
+            Value<String> paymentOptions = const Value.absent(),
+            Value<String> images = const Value.absent(),
+            Value<String> accessibilityFeatures = const Value.absent(),
             Value<DateTime> createdAt = const Value.absent(),
             Value<int> priceCOP = const Value.absent(),
             Value<int> groupSizeMax = const Value.absent(),
-            Value<String> paymentOptions = const Value.absent(),
-            Value<String> images = const Value.absent(),
             Value<bool> isActive = const Value.absent(),
             Value<DateTime?> lastSyncedAt = const Value.absent(),
             Value<bool> isDirty = const Value.absent(),
@@ -2134,11 +2196,12 @@ class $$ExperiencesTableTableManager extends RootTableManager<
             skillsToTeach: skillsToTeach,
             categories: categories,
             languages: languages,
+            paymentOptions: paymentOptions,
+            images: images,
+            accessibilityFeatures: accessibilityFeatures,
             createdAt: createdAt,
             priceCOP: priceCOP,
             groupSizeMax: groupSizeMax,
-            paymentOptions: paymentOptions,
-            images: images,
             isActive: isActive,
             lastSyncedAt: lastSyncedAt,
             isDirty: isDirty,
@@ -2160,11 +2223,12 @@ class $$ExperiencesTableTableManager extends RootTableManager<
             required String skillsToTeach,
             required String categories,
             required String languages,
+            required String paymentOptions,
+            required String images,
+            Value<String> accessibilityFeatures = const Value.absent(),
             required DateTime createdAt,
             required int priceCOP,
             required int groupSizeMax,
-            required String paymentOptions,
-            required String images,
             Value<bool> isActive = const Value.absent(),
             Value<DateTime?> lastSyncedAt = const Value.absent(),
             Value<bool> isDirty = const Value.absent(),
@@ -2186,11 +2250,12 @@ class $$ExperiencesTableTableManager extends RootTableManager<
             skillsToTeach: skillsToTeach,
             categories: categories,
             languages: languages,
+            paymentOptions: paymentOptions,
+            images: images,
+            accessibilityFeatures: accessibilityFeatures,
             createdAt: createdAt,
             priceCOP: priceCOP,
             groupSizeMax: groupSizeMax,
-            paymentOptions: paymentOptions,
-            images: images,
             isActive: isActive,
             lastSyncedAt: lastSyncedAt,
             isDirty: isDirty,

@@ -34,6 +34,8 @@ class DatabaseConverters {
       paymentOptions: drift.Value(jsonEncode(experience.paymentOptions)),
       images: drift.Value(jsonEncode(experience.images)),
       isActive: drift.Value(experience.isActive),
+      accessibilityFeatures:
+          drift.Value(jsonEncode(experience.accessibilityFeatures)),
       lastSyncedAt: drift.Value(DateTime.now()),
       isDirty: drift.Value(markDirty),
     );
@@ -65,6 +67,8 @@ class DatabaseConverters {
       paymentOptions: _parseStringList(driftExperience.paymentOptions),
       images: _parseStringList(driftExperience.images),
       isActive: driftExperience.isActive,
+      accessibilityFeatures:
+          _parseStringList(driftExperience.accessibilityFeatures),
     );
   }
 

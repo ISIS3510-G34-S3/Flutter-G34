@@ -95,17 +95,7 @@ final GoRouter appRouter = GoRouter(
           builder: (context, state) => const MyExperiencesScreen(),
         ),
 
-        // Host screen
-        GoRoute(
-          path: '/host/:id',
-          name: 'host',
-          builder: (context, state) {
-            final hostId = state.pathParameters['id']!;
-            return HostScreen(hostId: hostId);
-          },
-        ),
-
-        // Profile route
+        // Profile route (current user)
         GoRoute(
           path: '/profile/:id',
           name: 'profile',
@@ -115,6 +105,16 @@ final GoRouter appRouter = GoRouter(
           },
         ),
       ],
+    ),
+
+    // Host profile route (standalone - for viewing other users)
+    GoRoute(
+      path: '/host/:id',
+      name: 'host',
+      builder: (context, state) {
+        final hostId = state.pathParameters['id']!;
+        return HostScreen(hostId: hostId);
+      },
     ),
 
     // Experience detail route (standalone)

@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:travel_connect/models/host.dart';
+import 'package:travel_connect/models/experience.dart';
 import 'package:travel_connect/services/host_service.dart';
+import 'package:travel_connect/services/experience_service.dart';
 import 'package:travel_connect/theme/colors.dart';
 import 'package:travel_connect/theme/typography.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:travel_connect/widgets/experience_card.dart';
 
 class HostScreen extends StatefulWidget {
   final String hostId;
@@ -16,8 +19,11 @@ class HostScreen extends StatefulWidget {
 
 class _HostScreenState extends State<HostScreen> {
   final HostService _hostService = HostService();
+  final ExperienceService _experienceService = ExperienceService();
   Host? _host;
+  List<Experience> _hostExperiences = [];
   bool _isLoading = true;
+  bool _isLoadingExperiences = true;
 
   @override
   void initState() {
@@ -34,6 +40,9 @@ class _HostScreenState extends State<HostScreen> {
           _isLoading = false;
         });
       }
+
+      // Fetch host's experiences
+      _fetchHostExperiences();
     } catch (e) {
       if (mounted) {
         setState(() {
@@ -41,6 +50,26 @@ class _HostScreenState extends State<HostScreen> {
         });
       }
       debugPrint('Error fetching host: $e');
+    }
+  }
+
+  Future<void> _fetchHostExperiences() async {
+    try {
+      final experiences =
+          await _experienceService.getExperiencesByHost(widget.hostId);
+      if (mounted) {
+        setState(() {
+          _hostExperiences = experiences;
+          _isLoadingExperiences = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoadingExperiences = false;
+        });
+      }
+      debugPrint('Error fetching host experiences: $e');
     }
   }
 
@@ -93,19 +122,22 @@ class _HostScreenState extends State<HostScreen> {
         padding: const EdgeInsets.all(20),
         child: Row(
           children: [
-            CircleAvatar(
-              radius: 40,
-              backgroundColor: AppColors.peach.withOpacity(0.3),
-              backgroundImage: host.photoURL != null && host.photoURL!.isNotEmpty
-                  ? CachedNetworkImageProvider(host.photoURL!)
-                  : null,
-              child: host.photoURL == null || host.photoURL!.isEmpty
-                  ? Text(
-                      host.name.isNotEmpty ? host.name[0].toUpperCase() : '?',
-                      style: AppTypography.displaySmall
-                          .copyWith(color: AppColors.oliveGold),
-                    )
-                  : null,
+            Hero(
+              tag: 'host-avatar-${host.id}',
+              child: CircleAvatar(
+                radius: 40,
+                backgroundColor: AppColors.peach.withOpacity(0.3),
+                backgroundImage: host.photoURL != null && host.photoURL!.isNotEmpty
+                    ? CachedNetworkImageProvider(host.photoURL!)
+                    : null,
+                child: host.photoURL == null || host.photoURL!.isEmpty
+                    ? Text(
+                        host.name.isNotEmpty ? host.name[0].toUpperCase() : '?',
+                        style: AppTypography.displaySmall
+                            .copyWith(color: AppColors.oliveGold),
+                      )
+                    : null,
+              ),
             ),
             const SizedBox(width: 20),
             Expanded(
@@ -230,34 +262,96 @@ class _HostScreenState extends State<HostScreen> {
   }
 
   Widget _buildExperiencesSection(Host host) {
-    return Card(
-      elevation: 1,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Experiences', style: AppTypography.titleSmall),
-            const SizedBox(height: 16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Card(
+          elevation: 1,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _buildExperienceCounter(
-                  count: host.hostedExperiences,
-                  label: 'Hosted',
-                  color: AppColors.forestGreen,
-                ),
-                _buildExperienceCounter(
-                  count: host.joinedExperiences,
-                  label: 'Joined',
-                  color: AppColors.oliveGold,
+                Text('Experiences', style: AppTypography.titleSmall),
+                const SizedBox(height: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: [
+                    _buildExperienceCounter(
+                      count: _hostExperiences.length,
+                      label: 'Hosted',
+                      color: AppColors.forestGreen,
+                    ),
+                    _buildExperienceCounter(
+                      count: host.joinedExperiences,
+                      label: 'Joined',
+                      color: AppColors.oliveGold,
+                    ),
+                  ],
                 ),
               ],
             ),
-          ],
+          ),
         ),
-      ),
+        const SizedBox(height: 16),
+        if (_isLoadingExperiences)
+          const Center(
+            child: Padding(
+              padding: EdgeInsets.all(32.0),
+              child: CircularProgressIndicator(),
+            ),
+          )
+        else if (_hostExperiences.isEmpty)
+          Card(
+            elevation: 1,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            child: Padding(
+              padding: const EdgeInsets.all(32.0),
+              child: Center(
+                child: Column(
+                  children: [
+                    Icon(
+                      Icons.explore_off,
+                      size: 48,
+                      color: AppColors.textSecondary.withOpacity(0.5),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'No experiences yet',
+                      style: AppTypography.bodyLarge.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          )
+        else
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                child: Text(
+                  'Hosted Experiences',
+                  style: AppTypography.titleMedium.copyWith(
+                    color: AppColors.textPrimary,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              ..._hostExperiences.map((experience) => Padding(
+                    padding: const EdgeInsets.only(bottom: 16),
+                    child: ExperienceCard(
+                      experience: experience,
+                      onTap: () => context.push('/experience/${experience.id}'),
+                    ),
+                  )),
+            ],
+          ),
+      ],
     );
   }
 
