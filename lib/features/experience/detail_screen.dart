@@ -119,6 +119,10 @@ class _ExperienceDetailScreenState extends State<ExperienceDetailScreen> {
                 if (_experience!.categories.isNotEmpty)
                   _buildCategoriesSection(_experience!),
 
+                // Accessibility Features section
+                if (_experience!.accessibilityFeatures.isNotEmpty)
+                  _buildAccessibilitySection(_experience!),
+
                 // About section
                 _buildAboutSection(_experience!),
 
@@ -556,6 +560,53 @@ class _ExperienceDetailScreenState extends State<ExperienceDetailScreen> {
               );
             }).toList(),
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAccessibilitySection(Experience experience) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.divider),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.accessible, color: AppColors.forestGreen, size: 20),
+              const SizedBox(width: 8),
+              Text(
+                'Accessibility Features',
+                style: AppTypography.titleSmall.copyWith(
+                  color: AppColors.textPrimary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          ...experience.accessibilityFeatures.map((feature) => Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Row(
+              children: [
+                const Icon(Icons.check_circle, color: AppColors.forestGreen, size: 18),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    feature,
+                    style: AppTypography.bodyMedium.copyWith(
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          )),
         ],
       ),
     );
