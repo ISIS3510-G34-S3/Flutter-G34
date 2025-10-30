@@ -12,6 +12,7 @@ import 'dart:io';
 import 'package:image_picker/image_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/services.dart' as services;
+import 'package:path_provider/path_provider.dart';
 
 /// Create experience screen with form for adding new experiences
 class CreateExperienceScreen extends StatefulWidget {
@@ -397,30 +398,70 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             itemBuilder: (context, index) {
-              if (index < _localPhotos.length) {
-                final file = _localPhotos[index];
-                return AspectRatio(
-                  aspectRatio: 1,
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: Image.file(file, fit: BoxFit.cover),
-                  ),
+              // Always show the "Add Photo" button first
+              if (index == 0) {
+                return _buildPhotoPlaceholder('Add\nPhoto');
+              }
+              // Then show uploaded media
+              if (index - 1 < _localPhotos.length) {
+                final file = _localPhotos[index - 1];
+                return Stack(
+                  children: [
+                    Container(
+                      width: 120,
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Image.file(file, fit: BoxFit.cover),
+                      ),
+                    ),
+                    Positioned(
+                      top: 4,
+                      right: 4,
+                      child: GestureDetector(
+                        onTap: () => _removeMedia(index - 1),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: Colors.black54,
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          padding: const EdgeInsets.all(4),
+                          child: const Icon(
+                            Icons.close,
+                            size: 18,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 );
               }
-              return _buildPhotoPlaceholder('Add Photo');
+              return const SizedBox.shrink();
             },
-            separatorBuilder: (_, __) => const SizedBox(width: 16),
-            itemCount: (_localPhotos.length + 1).clamp(1, 8),
+            separatorBuilder: (_, __) => const SizedBox(width: 12),
+            itemCount: _localPhotos.length + 1,
           ),
         ),
       ],
     );
   }
 
+  void _removeMedia(int index) {
+    setState(() {
+      if (index < _localPhotos.length) {
+        _localPhotos.removeAt(index);
+      }
+      if (index < _imageUrls.length) {
+        _imageUrls.removeAt(index);
+      }
+    });
+  }
+
   Widget _buildPhotoPlaceholder(String label) {
     return GestureDetector(
       onTap: _addPhoto,
       child: Container(
+        width: 120,
         height: 120,
         decoration: BoxDecoration(
           color: AppColors.white,
@@ -442,6 +483,7 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
             const SizedBox(height: 8),
             Text(
               label,
+              textAlign: TextAlign.center,
               style: AppTypography.bodyMedium.copyWith(
                 color: AppColors.textSecondary,
               ),
@@ -750,7 +792,97 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
   }
 
   void _addPhoto() {
-    _pickAndUploadFromCamera();
+    _showMediaSourceDialog();
+  }
+
+  /// Show dialog to choose between camera and gallery
+  Future<void> _showMediaSourceDialog() async {
+    await showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          backgroundColor: AppColors.white,
+          title: Text(
+            'Add Photo',
+            style: AppTypography.titleMedium.copyWith(
+              color: AppColors.textPrimary,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppColors.forestGreen.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(
+                    Icons.camera_alt,
+                    color: AppColors.forestGreen,
+                    size: 24,
+                  ),
+                ),
+                title: Text(
+                  'Take Photo',
+                  style: AppTypography.bodyLarge.copyWith(
+                    color: AppColors.textPrimary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _pickAndUploadFromCamera();
+                },
+              ),
+              ListTile(
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppColors.oliveGold.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(
+                    Icons.photo_library,
+                    color: AppColors.oliveGold,
+                    size: 24,
+                  ),
+                ),
+                title: Text(
+                  'Choose from Gallery',
+                  style: AppTypography.bodyLarge.copyWith(
+                    color: AppColors.textPrimary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _pickAndUploadFromGallery();
+                },
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text(
+                'Cancel',
+                style: AppTypography.bodyLarge.copyWith(
+                  color: AppColors.textSecondary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   Future<void> _pickAndUploadFromCamera() async {
@@ -762,34 +894,118 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
           imageQuality: 85);
       if (captured == null) return;
 
-      // Upload to Firebase Storage under user ID folder
-      final user = FirebaseAuth.instance.currentUser;
-      if (user == null) {
-        throw Exception('No authenticated user');
-      }
-      final String uid = user.uid;
-      final String fileName =
-          'photo_${DateTime.now().millisecondsSinceEpoch}.jpg';
-      final File file = File(captured.path);
-
-      final storage = FirebaseStorage.instanceFor(
-        bucket: 'gs://travelappbd-8e204.firebasestorage.app',
-      );
-      final ref = storage.ref().child('experiences/$uid/$fileName');
-      final uploadTask =
-          await ref.putFile(file, SettableMetadata(contentType: 'image/jpeg'));
-      final String downloadUrl = await uploadTask.ref.getDownloadURL();
-
-      if (!mounted) return;
-      setState(() {
-        _localPhotos.add(file);
-        _imageUrls.add(downloadUrl);
-      });
+      await _saveAndUploadMedia(captured, isVideo: false);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Failed to capture photo: $e'),
+          backgroundColor: AppColors.lava,
+        ),
+      );
+    }
+  }
+
+  Future<void> _pickAndUploadFromGallery() async {
+    try {
+      final ImagePicker picker = ImagePicker();
+      final XFile? picked = await picker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 85,
+      );
+      if (picked == null) return;
+
+      await _saveAndUploadMedia(picked, isVideo: false);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to pick image: $e'),
+          backgroundColor: AppColors.lava,
+        ),
+      );
+    }
+  }
+
+  /// Save media locally and upload to Firebase Storage
+  Future<void> _saveAndUploadMedia(XFile mediaFile,
+      {required bool isVideo}) async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        throw Exception('No authenticated user');
+      }
+
+      // Save to Pictures/Travel Connect directory for easy user access
+      Directory? picturesDir;
+      if (Platform.isAndroid) {
+        // On Android, use external storage Pictures directory
+        final externalDirs = await getExternalStorageDirectories(
+            type: StorageDirectory.pictures);
+        if (externalDirs != null && externalDirs.isNotEmpty) {
+          // Use public Pictures directory
+          final basePath = externalDirs.first.path.split('/Android')[0];
+          picturesDir = Directory('$basePath/Pictures/Travel Connect');
+        }
+      } else if (Platform.isIOS) {
+        // On iOS, use app's documents directory (photos saved here can be accessed via Files app)
+        final appDir = await getApplicationDocumentsDirectory();
+        picturesDir = Directory('${appDir.path}/Travel Connect');
+      } else {
+        // Fallback for other platforms
+        final appDir = await getApplicationDocumentsDirectory();
+        picturesDir = Directory('${appDir.path}/Travel Connect');
+      }
+
+      if (picturesDir == null) {
+        throw Exception('Could not find storage directory');
+      }
+
+      if (!await picturesDir.exists()) {
+        await picturesDir.create(recursive: true);
+      }
+
+      final String uid = user.uid;
+      final String timestamp = DateTime.now().millisecondsSinceEpoch.toString();
+      final String extension = 'jpg';
+      final String fileName = 'photo_$timestamp.$extension';
+
+      // Copy to local storage
+      final localPath = '${picturesDir.path}/$fileName';
+      final File localFile = await File(mediaFile.path).copy(localPath);
+
+      // Upload to Firebase Storage
+      final storage = FirebaseStorage.instanceFor(
+        bucket: 'gs://travelappbd-8e204.firebasestorage.app',
+      );
+      final ref = storage.ref().child('experiences/$uid/$fileName');
+      final uploadTask = await ref.putFile(
+        localFile,
+        SettableMetadata(contentType: isVideo ? 'video/mp4' : 'image/jpeg'),
+      );
+      final String downloadUrl = await uploadTask.ref.getDownloadURL();
+
+      if (!mounted) return;
+      setState(() {
+        _localPhotos.add(localFile);
+        _imageUrls.add(downloadUrl);
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            isVideo
+                ? 'Video saved locally and uploaded!'
+                : 'Photo saved locally and uploaded!',
+          ),
+          backgroundColor: AppColors.forestGreen,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to save ${isVideo ? 'video' : 'photo'}: $e'),
           backgroundColor: AppColors.lava,
         ),
       );

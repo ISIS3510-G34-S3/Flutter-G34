@@ -541,6 +541,11 @@ class ProfileScreen extends StatelessWidget {
                   _showComingSoonDialog(context, 'Notification Preferences'),
             ),
             _buildSettingItem(
+              icon: Icons.photo_library_outlined,
+              title: 'Local Media Storage',
+              onTap: () => context.push('/local-media'),
+            ),
+            _buildSettingItem(
               icon: Icons.privacy_tip_outlined,
               title: 'Privacy Settings',
               onTap: () => _showComingSoonDialog(context, 'Privacy Settings'),

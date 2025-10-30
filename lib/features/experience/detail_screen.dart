@@ -105,6 +105,12 @@ class _ExperienceDetailScreenState extends State<ExperienceDetailScreen> {
                 if (_experience!.images.isNotEmpty)
                   _buildPhotoGallery(_experience!),
 
+                // About section
+                _buildAboutSection(_experience!),
+
+                // Skills exchange section
+                _buildSkillsSection(_experience!),
+
                 // Price and details section
                 _buildPriceAndDetailsSection(_experience!),
 
@@ -118,15 +124,17 @@ class _ExperienceDetailScreenState extends State<ExperienceDetailScreen> {
                 if (_experience!.categories.isNotEmpty)
                   _buildCategoriesSection(_experience!),
 
+                // Languages section
+                if (_experience!.languages.isNotEmpty)
+                  _buildLanguagesSection(_experience!),
+
                 // Accessibility Features section
                 if (_experience!.accessibilityFeatures.isNotEmpty)
                   _buildAccessibilitySection(_experience!),
 
-                // About section
-                _buildAboutSection(_experience!),
-
-                // Skills exchange section
-                _buildSkillsSection(_experience!),
+                // Payment Methods section
+                if (_experience!.paymentOptions.isNotEmpty)
+                  _buildPaymentMethodsSection(_experience!),
 
                 const SizedBox(height: 120), // Space for bottom actions
               ],
@@ -166,13 +174,15 @@ class _ExperienceDetailScreenState extends State<ExperienceDetailScreen> {
               });
             },
             itemBuilder: (context, index) {
+              final mediaUrl = experience.images[index];
+
               return GestureDetector(
                 onTap: () =>
                     _viewImageFullscreen(context, experience.images, index),
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(12),
                   child: CachedNetworkImage(
-                    imageUrl: experience.images[index],
+                    imageUrl: mediaUrl,
                     fit: BoxFit.cover,
                     placeholder: (context, url) => Container(
                       color: AppColors.peach.withOpacity(0.3),
@@ -394,7 +404,9 @@ class _ExperienceDetailScreenState extends State<ExperienceDetailScreen> {
                   backgroundColor: AppColors.forestGreen.withValues(alpha: 0.2),
                   child: photoURL == null || photoURL.isEmpty
                       ? Text(
-                          displayName.isNotEmpty ? displayName[0].toUpperCase() : '?',
+                          displayName.isNotEmpty
+                              ? displayName[0].toUpperCase()
+                              : '?',
                           style: AppTypography.titleMedium.copyWith(
                             color: AppColors.forestGreen,
                           ),
@@ -567,6 +579,69 @@ class _ExperienceDetailScreenState extends State<ExperienceDetailScreen> {
     );
   }
 
+  Widget _buildLanguagesSection(Experience experience) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.divider),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.language,
+                  color: AppColors.forestGreen, size: 20),
+              const SizedBox(width: 8),
+              Text(
+                'Languages',
+                style: AppTypography.titleSmall.copyWith(
+                  color: AppColors.textPrimary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: experience.languages.map((language) {
+              return Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: AppColors.forestGreen.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: AppColors.forestGreen.withOpacity(0.3)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.check_circle,
+                      color: AppColors.forestGreen,
+                      size: 16,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      language,
+                      style: AppTypography.bodyMedium.copyWith(
+                        color: AppColors.textPrimary,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }).toList(),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildAccessibilitySection(Experience experience) {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -581,7 +656,8 @@ class _ExperienceDetailScreenState extends State<ExperienceDetailScreen> {
         children: [
           Row(
             children: [
-              const Icon(Icons.accessible, color: AppColors.forestGreen, size: 20),
+              const Icon(Icons.accessible,
+                  color: AppColors.forestGreen, size: 20),
               const SizedBox(width: 8),
               Text(
                 'Accessibility Features',
@@ -593,22 +669,101 @@ class _ExperienceDetailScreenState extends State<ExperienceDetailScreen> {
           ),
           const SizedBox(height: 12),
           ...experience.accessibilityFeatures.map((feature) => Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: Row(
-              children: [
-                const Icon(Icons.check_circle, color: AppColors.forestGreen, size: 18),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    feature,
-                    style: AppTypography.bodyMedium.copyWith(
-                      color: AppColors.textPrimary,
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Row(
+                  children: [
+                    const Icon(Icons.check_circle,
+                        color: AppColors.forestGreen, size: 18),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        feature,
+                        style: AppTypography.bodyMedium.copyWith(
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
                     ),
-                  ),
+                  ],
                 ),
-              ],
-            ),
-          )),
+              )),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPaymentMethodsSection(Experience experience) {
+    // Map payment options to icons and display names
+    Map<String, Map<String, dynamic>> paymentInfo = {
+      'cash': {'icon': Icons.money, 'name': 'Cash'},
+      'credit_card': {'icon': Icons.credit_card, 'name': 'Credit Card'},
+      'debit_card': {'icon': Icons.credit_card, 'name': 'Debit Card'},
+      'bank_transfer': {'icon': Icons.account_balance, 'name': 'Bank Transfer'},
+      'paypal': {'icon': Icons.payment, 'name': 'PayPal'},
+      'nequi': {'icon': Icons.phone_android, 'name': 'Nequi'},
+      'daviplata': {'icon': Icons.phone_android, 'name': 'Daviplata'},
+      'pse': {'icon': Icons.account_balance_wallet, 'name': 'PSE'},
+    };
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.divider),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.payment, color: AppColors.oliveGold, size: 20),
+              const SizedBox(width: 8),
+              Text(
+                'Payment Methods',
+                style: AppTypography.titleSmall.copyWith(
+                  color: AppColors.textPrimary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: experience.paymentOptions.map((option) {
+              final info = paymentInfo[option.toLowerCase()] ??
+                  {'icon': Icons.payments, 'name': option};
+              return Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: AppColors.oliveGold.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border:
+                      Border.all(color: AppColors.oliveGold.withOpacity(0.3)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      info['icon'],
+                      color: AppColors.oliveGold,
+                      size: 18,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      info['name'],
+                      style: AppTypography.bodyMedium.copyWith(
+                        color: AppColors.textPrimary,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }).toList(),
+          ),
         ],
       ),
     );
