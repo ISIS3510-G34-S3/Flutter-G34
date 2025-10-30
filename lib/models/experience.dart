@@ -50,14 +50,6 @@ class Experience {
   factory Experience.fromFirestore(DocumentSnapshot doc) {
     Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
 
-    // Debug: Print the raw data
-    print('=== Processing document: ${doc.id} ===');
-    print('Raw data: $data');
-    print('Data types:');
-    data.forEach((key, value) {
-      print('  $key: ${value.runtimeType} = $value');
-    });
-
     // Handle hostId which might be a DocumentReference or String
     String hostIdValue = '';
     if (data['hostId'] is DocumentReference) {
