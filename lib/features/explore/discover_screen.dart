@@ -62,6 +62,33 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
         },
         child: Column(
           children: [
+            // Connectivity status banner
+            if (!_viewModel.isOnline)
+              Container(
+                width: double.infinity,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                color: AppColors.oliveGold.withValues(alpha: 0.2),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.cloud_off,
+                      size: 16,
+                      color: AppColors.oliveGold,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'No internet connection - using offline data',
+                        style: AppTypography.bodySmall.copyWith(
+                          color: AppColors.oliveGold,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
             // Search and filters section
             _buildSearchSection(),
 
@@ -169,77 +196,128 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
       return _buildEmptyState();
     }
 
-    return ListView.builder(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      itemCount: _viewModel.filteredExperiences.length,
-      itemBuilder: (context, index) {
-        final experience = _viewModel.filteredExperiences[index];
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 16),
-          child: ExperienceCard(
-            experience: experience,
-            onTap: () => _navigateToExperience(experience.id),
-          ),
-        );
+    return RefreshIndicator(
+      onRefresh: () async {
+        await _viewModel.fetchExperiences(forceRefresh: true);
       },
+      color: AppColors.forestGreen,
+      child: ListView.builder(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        physics: const AlwaysScrollableScrollPhysics(),
+        itemCount: _viewModel.filteredExperiences.length,
+        itemBuilder: (context, index) {
+          final experience = _viewModel.filteredExperiences[index];
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 16),
+            child: ExperienceCard(
+              experience: experience,
+              onTap: () => _navigateToExperience(experience.id),
+            ),
+          );
+        },
+      ),
     );
   }
 
   Widget _buildEmptyState() {
-    return SingleChildScrollView(
-      physics: const AlwaysScrollableScrollPhysics(),
-      padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).viewInsets.bottom,
-      ),
-      child: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(32),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                width: 80,
-                height: 80,
-                decoration: BoxDecoration(
-                  color: AppColors.peach.withValues(alpha: 0.3),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.search_off,
-                  size: 40,
-                  color: AppColors.oliveGold,
-                ),
-              ),
-              const SizedBox(height: 24),
-              Text(
-                'No experiences found',
-                style: AppTypography.titleMedium.copyWith(
-                  color: AppColors.textPrimary,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Try adjusting your search or filters to find more experiences.',
-                style: AppTypography.bodyMedium.copyWith(
-                  color: AppColors.textSecondary,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 24),
-              TextButton(
-                onPressed: () {
-                  _searchController.clear();
-                  _viewModel.clearAllFilters();
-                  FocusScope.of(context).unfocus();
-                },
-                child: Text(
-                  'Clear all filters',
-                  style: AppTypography.buttonMedium.copyWith(
-                    color: AppColors.forestGreen,
+    // Check if we have no data and are offline
+    final bool hasNoDataAndOffline =
+        _viewModel.allExperiences.isEmpty && !_viewModel.isOnline;
+
+    // Check if filters are active
+    final bool hasActiveFilters = _viewModel.searchQuery.isNotEmpty ||
+        _viewModel.selectedCategories.isNotEmpty ||
+        _viewModel.selectedRegions.isNotEmpty ||
+        _viewModel.selectedLanguages.isNotEmpty ||
+        _viewModel.minPrice > 0 ||
+        _viewModel.maxPrice < double.infinity;
+
+    return RefreshIndicator(
+      onRefresh: () async {
+        await _viewModel.fetchExperiences(forceRefresh: true);
+      },
+      color: AppColors.forestGreen,
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom,
+        ),
+        child: SizedBox(
+          height: MediaQuery.of(context).size.height * 0.6,
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(32),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    width: 80,
+                    height: 80,
+                    decoration: BoxDecoration(
+                      color: AppColors.peach.withValues(alpha: 0.3),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      hasNoDataAndOffline ? Icons.cloud_off : Icons.search_off,
+                      size: 40,
+                      color: AppColors.oliveGold,
+                    ),
                   ),
-                ),
+                  const SizedBox(height: 24),
+                  Text(
+                    hasNoDataAndOffline
+                        ? 'No cached data available'
+                        : 'No experiences found',
+                    style: AppTypography.titleMedium.copyWith(
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    hasNoDataAndOffline
+                        ? 'You\'re offline and no cached experiences are available. Please connect to the internet to load experiences.'
+                        : hasActiveFilters
+                            ? 'Try adjusting your search or filters to find more experiences.'
+                            : 'Pull down to refresh or check your internet connection.',
+                    style: AppTypography.bodyMedium.copyWith(
+                      color: AppColors.textSecondary,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 24),
+                  if (hasActiveFilters && !hasNoDataAndOffline)
+                    TextButton(
+                      onPressed: () {
+                        _searchController.clear();
+                        _viewModel.clearAllFilters();
+                        FocusScope.of(context).unfocus();
+                      },
+                      child: Text(
+                        'Clear all filters',
+                        style: AppTypography.buttonMedium.copyWith(
+                          color: AppColors.forestGreen,
+                        ),
+                      ),
+                    ),
+                  if (hasNoDataAndOffline)
+                    ElevatedButton.icon(
+                      onPressed: () async {
+                        await _viewModel.fetchExperiences(forceRefresh: true);
+                      },
+                      icon: const Icon(Icons.refresh),
+                      label: const Text('Try Again'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.forestGreen,
+                        foregroundColor: AppColors.white,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 24,
+                          vertical: 12,
+                        ),
+                      ),
+                    ),
+                ],
               ),
-            ],
+            ),
           ),
         ),
       ),

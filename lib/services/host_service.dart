@@ -1,45 +1,64 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/host.dart';
+import '../database/app_database.dart';
+import '../database/database_converters.dart';
 
 class HostService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
+  final AppDatabase _database = AppDatabase();
 
+  /// Get host/user by ID with offline-first strategy
   Future<Host?> getHostById(String id) async {
     Host? host;
-    // 1. Try cache first
+
+    // STEP 1: Try Firebase cache
     try {
-      final doc = await _firestore
+      DocumentSnapshot doc = await _firestore
           .collection('users')
           .doc(id)
           .get(const GetOptions(source: Source.cache));
       if (doc.exists) {
         host = Host.fromFirestore(doc);
+        print('✓ Got host $id from Firebase cache');
+        return host;
       }
     } catch (e) {
       print('Could not get host $id from cache: $e');
     }
 
-    // 2. Check for internet connection
-    final connectivityResult = await (Connectivity().checkConnectivity());
-    if (connectivityResult == ConnectivityResult.none) {
-      print('No internet connection. Returning cached host for $id.');
-      return host;
-    }
-
-    // 3. If connected, try server
+    // STEP 2: Try local database
     try {
-      DocumentSnapshot doc =
-          await _firestore.collection('users').doc(id).get();
-      if (doc.exists) {
-        host = Host.fromFirestore(doc);
+      final localUser = await _database.getUserById(id);
+      if (localUser != null) {
+        host = DatabaseConverters.hostFromDrift(localUser);
+        print('✓ Got host $id from local database');
+        return host;
       }
     } catch (e) {
-      print('Could not fetch host $id from server: $e');
+      print('Could not get host $id from local DB: $e');
     }
-    return host;
+
+    // STEP 3: Try Firebase server
+    try {
+      DocumentSnapshot doc = await _firestore.collection('users').doc(id).get();
+      if (doc.exists) {
+        host = Host.fromFirestore(doc);
+        print('✓ Got host $id from Firebase server');
+
+        // Update local database
+        await _database.upsertUser(
+          DatabaseConverters.hostToCompanion(host),
+        );
+
+        return host;
+      }
+    } catch (e) {
+      print('Error getting host from server: $e');
+    }
+
+    return null;
   }
 
   Future<Host?> getCurrentUserHost() async {
@@ -51,7 +70,7 @@ class HostService {
     final docId = (user.email ?? '').toLowerCase().isNotEmpty
         ? (user.email ?? '').toLowerCase()
         : user.uid;
-    
+
     return getHostById(docId);
   }
 }

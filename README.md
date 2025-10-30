@@ -16,6 +16,11 @@ TravelConnect is a mobile application that allows users to discover, share, and 
 - **User Profiles**: Personalized user profiles and experience management
 - **Photo Galleries**: Swipeable image galleries for experiences
 - **Modern UI**: Material Design 3 with custom theming and responsive layouts
+- **Offline-First Architecture**: Full offline support with local SQLite database using Drift
+- **Smart Data Sync**: Multi-layer caching strategy (Firebase Cache → Local DB → Firebase Server)
+- **Battery Efficient**: Intelligent background sync without periodic polling
+- **Connectivity Awareness**: Real-time network status monitoring with offline indicators
+- **Pull-to-Refresh**: Swipe down to manually refresh experiences from server
 
 ## 🏗️ Project Structure
 
@@ -24,6 +29,9 @@ lib/
 ├── app/                    # App configuration and routing
 │   ├── app.dart           # Main app widget
 │   └── router.dart        # GoRouter configuration
+├── database/              # Local persistence layer
+│   ├── app_database.dart  # Drift database schema & DAOs
+│   └── database_converters.dart  # Model converters
 ├── features/              # Feature-based organization
 │   ├── auth/              # Authentication features
 │   ├── create/            # Experience creation
@@ -31,6 +39,12 @@ lib/
 │   ├── explore/           # Discovery and browsing
 │   ├── map/               # Map functionality
 │   └── profile/           # User profiles
+├── models/                # Domain models
+│   ├── experience.dart    # Experience model
+│   └── host.dart          # User/Host model
+├── services/              # Business logic & data services
+│   ├── experience_service.dart  # Experience data with offline-first
+│   └── host_service.dart        # User/Host data with offline-first
 ├── theme/                 # Design system
 │   ├── colors.dart        # Color palette
 │   ├── theme.dart         # Material theme
@@ -109,6 +123,63 @@ lib/
 - Type-safe route parameters
 - Centralized route configuration in `app/router.dart`
 
+### Offline-First Architecture
+
+The app implements a sophisticated multi-layer caching strategy for optimal performance and offline support:
+
+#### Data Flow Strategy
+
+1. **Firebase Cache** (In-Memory, Fastest)
+
+   - First check for data in Firebase's local cache
+   - Instant response for recently accessed data
+   - Automatically managed by Firebase SDK
+
+2. **Local SQLite Database** (Persistent, Offline)
+
+   - Drift-based relational database for long-term storage
+   - Stores `Experiences` and `Users` tables
+   - Works completely offline
+   - Automatically synced from Firebase cache/server
+
+3. **Firebase Server** (Network, Authoritative)
+   - Fetches latest data when online
+   - Updates both cache and local database
+   - Background refresh doesn't block UI
+
+#### Key Design Principles
+
+- **No Periodic Polling**: The app never polls Firebase every N minutes to save battery
+- **Smart Sync**: Data flows from cache → local DB → server in a waterfall pattern
+- **Background Updates**: Server refreshes happen in background without blocking UI
+- **Dirty Flag**: Tracks local changes that need to be synced to Firebase
+- **Isolate-Ready**: Database operations are async and can run on background isolates
+
+#### Database Schema
+
+**Experiences Table**
+
+- Core fields: id, title, summary, hostId, location (lat/lng), department
+- Ratings: avgRating, reviewsCount, hostVerified
+- Details: duration, priceCOP, groupSizeMax
+- Arrays (JSON): skillsToLearn, skillsToTeach, categories, languages, paymentOptions, images
+- Metadata: createdAt, lastSyncedAt, isDirty, isActive
+
+**Users Table**
+
+- Core fields: id, name, email, photoURL
+- Ratings: avgHostRating, isVerified
+- Profile: about, languages (JSON), responseRate
+- Stats: hostedExperiences, joinedExperiences
+- Metadata: memberSince, lastSyncedAt, isDirty
+
+#### Service Layer Architecture
+
+- `ExperienceService`: Implements 3-layer fetching for experiences
+- `HostService`: Implements 3-layer fetching for users/hosts
+- `DatabaseConverters`: Transforms between Firestore, Drift, and Domain models
+- `AppDatabase`: Provides CRUD operations and queries for both tables
+
 ### Routes Structure:
 
 - `/login` - Authentication screen
@@ -150,13 +221,19 @@ lib/
    flutter pub get
    ```
 
-3. **Verify setup**:
+3. **Generate Drift database code**:
+
+   ```bash
+   dart run build_runner build --delete-conflicting-outputs
+   ```
+
+4. **Verify setup**:
 
    ```bash
    flutter doctor
    ```
 
-4. **Run the app**:
+5. **Run the app**:
    ```bash
    flutter run
    ```
@@ -176,8 +253,14 @@ lib/
    ```
 
 3. **Format Code**:
+
    ```bash
    dart format .
+   ```
+
+4. **Regenerate Drift Code** (after schema changes):
+   ```bash
+   dart run build_runner build --delete-conflicting-outputs
    ```
 
 ## 📦 Dependencies
@@ -190,11 +273,29 @@ lib/
 - **google_fonts**: Custom typography
 - **flutter_svg**: SVG asset support
 - **intl**: Internationalization support
+- **google_maps_flutter**: Interactive maps
+- **geolocator**: Location services
+- **location**: Device location tracking
+- **firebase_core**: Firebase initialization
+- **firebase_auth**: User authentication
+- **cloud_firestore**: Cloud database
+- **firebase_storage**: File storage
+- **google_sign_in**: Google OAuth
+- **http**: HTTP client
+- **image_picker**: Camera/gallery access
+- **drift**: Local SQLite database ORM
+- **sqlite3_flutter_libs**: SQLite native libraries
+- **path_provider**: App directories access
+- **path**: File path utilities
+- **cached_network_image**: Network image caching
+- **connectivity_plus**: Network connectivity monitoring
 
 ### Development Dependencies
 
 - **flutter_test**: Testing framework
 - **flutter_lints**: Linting rules
+- **drift_dev**: Drift code generator
+- **build_runner**: Code generation runner
 
 ## 🧪 Testing
 
@@ -359,6 +460,12 @@ The app depends on the following notable packages (versions pinned in `pubspec.y
 - http: ^1.2.1
 - image_picker: ^1.0.7
 - firebase_storage: ^12.0.0
+- drift: ^2.20.3
+- sqlite3_flutter_libs: ^0.5.24
+- path_provider: ^2.1.4
+- path: ^1.9.0
+- cached_network_image: ^3.4.1
+- connectivity_plus: ^6.0.5
 
 Run `flutter pub get` to install them.
 
@@ -367,6 +474,9 @@ Run `flutter pub get` to install them.
 ```powershell
 # Get dependencies
 flutter pub get
+
+# Generate Drift database code (required after schema changes)
+dart run build_runner build --delete-conflicting-outputs
 
 # Run on connected device or default platform
 flutter run
@@ -387,6 +497,9 @@ flutter clean; flutter pub get
 flutter analyze
 dart format .
 flutter test
+
+# Watch mode for continuous code generation during development
+dart run build_runner watch --delete-conflicting-outputs
 ```
 
 ## 📁 Important files & locations
@@ -394,13 +507,21 @@ flutter test
 - `lib/main.dart` — App entry point and Firebase initialization
 - `lib/app/app.dart` — Top-level app widget
 - `lib/app/router.dart` — Route definitions (uses GoRouter)
+- `lib/database/app_database.dart` — Local SQLite database schema (Drift)
+- `lib/database/database_converters.dart` — Model conversion utilities
+- `lib/services/experience_service.dart` — Experience data service with offline-first
+- `lib/services/host_service.dart` — User/Host data service with offline-first
 - `lib/firebase_options.dart` — Generated Firebase config
 - `android/app/google-services.json` — Android Firebase config
+- `build.yaml` — Drift code generation configuration
 
 ## ✅ Project notes / gotchas
 
 - The project expects `firebase_options.dart` to be present. If you regenerate Firebase configuration for a new Firebase project, update that file and keep corresponding platform files (`google-services.json`, `GoogleService-Info.plist`) in place.
 - Map features rely on `google_maps_flutter` and platform-specific API keys (ensure Android `AndroidManifest.xml` and iOS plist have proper API keys when enabling Maps).
+- **Drift Code Generation**: After modifying database schema in `app_database.dart`, you must run `dart run build_runner build --delete-conflicting-outputs` to regenerate the `app_database.g.dart` file.
+- The local SQLite database file is stored at `<AppDocumentsDirectory>/travel_connect.sqlite`.
+- Database operations are async and safe for background execution on isolates.
 
 ## Contributors / Contact
 

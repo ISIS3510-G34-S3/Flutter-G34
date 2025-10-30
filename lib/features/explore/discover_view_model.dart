@@ -3,18 +3,24 @@ import 'package:location/location.dart';
 import 'dart:math' show cos, sqrt, sin, atan2, pi;
 import 'package:travel_connect/models/experience.dart';
 import 'package:travel_connect/services/experience_service.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
+import 'dart:async';
 
 class DiscoverViewModel extends ChangeNotifier {
   // Services
   final ExperienceService _experienceService = ExperienceService();
   final Location _location = Location();
+  final Connectivity _connectivity = Connectivity();
+  StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
 
   // State
   List<Experience> _allExperiences = [];
   List<Experience> _filteredExperiences = [];
   LocationData? _currentLocation;
   bool _isLoading = true;
-  
+  bool _isOnline = true;
+  bool _isRefreshing = false;
+
   // Filter state
   String _searchQuery = '';
   List<String> _selectedCategories = [];
@@ -28,6 +34,8 @@ class DiscoverViewModel extends ChangeNotifier {
   List<Experience> get filteredExperiences => _filteredExperiences;
   LocationData? get currentLocation => _currentLocation;
   bool get isLoading => _isLoading;
+  bool get isOnline => _isOnline;
+  bool get isRefreshing => _isRefreshing;
   String get searchQuery => _searchQuery;
   List<String> get selectedCategories => _selectedCategories;
   List<String> get selectedRegions => _selectedRegions;
@@ -38,7 +46,38 @@ class DiscoverViewModel extends ChangeNotifier {
   /// Initialize location and fetch experiences
   Future<void> initialize() async {
     await _initializeLocation();
+    await _checkConnectivity();
+    _setupConnectivityListener();
     await fetchExperiences();
+  }
+
+  /// Check initial connectivity status
+  Future<void> _checkConnectivity() async {
+    try {
+      final result = await _connectivity.checkConnectivity();
+      _isOnline = !result.contains(ConnectivityResult.none);
+    } catch (e) {
+      debugPrint('Error checking connectivity: $e');
+      _isOnline = true; // Assume online if check fails
+    }
+  }
+
+  /// Listen to connectivity changes
+  void _setupConnectivityListener() {
+    _connectivitySubscription = _connectivity.onConnectivityChanged.listen(
+      (List<ConnectivityResult> results) {
+        final wasOnline = _isOnline;
+        _isOnline = !results.contains(ConnectivityResult.none);
+
+        // If we just came back online, refresh data
+        if (!wasOnline && _isOnline) {
+          debugPrint('Connection restored, refreshing data...');
+          fetchExperiences(forceRefresh: true);
+        }
+
+        notifyListeners();
+      },
+    );
   }
 
   /// Initialize location services and get current location
@@ -70,15 +109,26 @@ class DiscoverViewModel extends ChangeNotifier {
   }
 
   /// Fetch experiences from service
-  Future<void> fetchExperiences() async {
+  Future<void> fetchExperiences({bool forceRefresh = false}) async {
+    if (_isRefreshing && !_isLoading)
+      return; // Prevent multiple simultaneous refreshes
+
+    if (!_isLoading) {
+      _isRefreshing = true;
+      notifyListeners();
+    }
+
     try {
-      final experiences = await _experienceService.getExperiences();
+      final experiences =
+          await _experienceService.getExperiences(forceRefresh: forceRefresh);
       _allExperiences = experiences;
       _filterExperiences();
       _isLoading = false;
+      _isRefreshing = false;
       notifyListeners();
     } catch (e) {
       _isLoading = false;
+      _isRefreshing = false;
       notifyListeners();
       debugPrint('Error fetching experiences: $e');
     }
@@ -226,5 +276,11 @@ class DiscoverViewModel extends ChangeNotifier {
 
   double _toRadians(double degree) {
     return degree * (pi / 180);
+  }
+
+  @override
+  void dispose() {
+    _connectivitySubscription?.cancel();
+    super.dispose();
   }
 }
