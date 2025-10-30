@@ -23,11 +23,13 @@ class Experiences extends Table {
   TextColumn get skillsToTeach => text()(); // JSON array as string
   TextColumn get categories => text()(); // JSON array as string
   TextColumn get languages => text()(); // JSON array as string
+  TextColumn get paymentOptions => text()(); // JSON array as string
+  TextColumn get images => text()(); // JSON array as string
+  TextColumn get accessibilityFeatures =>
+      text().withDefault(const Constant('[]'))(); // JSON array as string
   DateTimeColumn get createdAt => dateTime()();
   IntColumn get priceCOP => integer()();
   IntColumn get groupSizeMax => integer()();
-  TextColumn get paymentOptions => text()(); // JSON array as string
-  TextColumn get images => text()(); // JSON array as string
   BoolColumn get isActive => boolean().withDefault(const Constant(true))();
   DateTimeColumn get lastSyncedAt => dateTime().nullable()();
   BoolColumn get isDirty =>

@@ -5,7 +5,6 @@ import 'package:go_router/go_router.dart';
 import 'package:travel_connect/models/experience.dart';
 import 'package:travel_connect/services/experience_service.dart';
 import 'package:travel_connect/services/host_service.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../../theme/colors.dart';
 import '../../theme/typography.dart';
@@ -385,20 +384,23 @@ class _ExperienceDetailScreenState extends State<ExperienceDetailScreen> {
           Row(
             children: [
               // Host avatar
-              CircleAvatar(
-                radius: 24,
-                backgroundImage: photoURL != null && photoURL.isNotEmpty
-                    ? NetworkImage(photoURL)
-                    : null,
-                backgroundColor: AppColors.forestGreen.withValues(alpha: 0.2),
-                child: photoURL == null || photoURL.isEmpty
-                    ? Text(
-                        displayName.isNotEmpty ? displayName[0].toUpperCase() : '?',
-                        style: AppTypography.titleMedium.copyWith(
-                          color: AppColors.forestGreen,
-                        ),
-                      )
-                    : null,
+              Hero(
+                tag: 'host-avatar-${host.id}',
+                child: CircleAvatar(
+                  radius: 24,
+                  backgroundImage: photoURL != null && photoURL.isNotEmpty
+                      ? CachedNetworkImageProvider(photoURL)
+                      : null,
+                  backgroundColor: AppColors.forestGreen.withValues(alpha: 0.2),
+                  child: photoURL == null || photoURL.isEmpty
+                      ? Text(
+                          displayName.isNotEmpty ? displayName[0].toUpperCase() : '?',
+                          style: AppTypography.titleMedium.copyWith(
+                            color: AppColors.forestGreen,
+                          ),
+                        )
+                      : null,
+                ),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -433,7 +435,7 @@ class _ExperienceDetailScreenState extends State<ExperienceDetailScreen> {
               // View profile button
               OutlinedButton(
                 onPressed: () {
-                  context.push('/profile/${host.id}');
+                  context.push('/host/${host.id}');
                 },
                 style: OutlinedButton.styleFrom(
                   padding:
@@ -951,7 +953,19 @@ class _ExperienceDetailScreenState extends State<ExperienceDetailScreen> {
   }
 
   void _messageHost(BuildContext context, String hostId) {
-    context.push('/messaging/$hostId');
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Messaging'),
+        content: const Text('This feature is coming soon!'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
   }
 
   void _bookExperience(BuildContext context) {
