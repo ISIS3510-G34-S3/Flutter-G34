@@ -12,7 +12,6 @@ import 'dart:io';
 import 'package:image_picker/image_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/services.dart' as services;
-import '../../services/image_processing_service.dart';
 
 /// Create experience screen with form for adding new experiences
 class CreateExperienceScreen extends StatefulWidget {
@@ -402,39 +401,9 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
                 final file = _localPhotos[index];
                 return AspectRatio(
                   aspectRatio: 1,
-                  child: Stack(
-                    children: [
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
-                        child: Image.file(file, fit: BoxFit.cover),
-                      ),
-                      Positioned(
-                        top: 4,
-                        right: 4,
-                        child: GestureDetector(
-                          onTap: () => _deletePhoto(index),
-                          child: Container(
-                            padding: const EdgeInsets.all(4),
-                            decoration: BoxDecoration(
-                              color: AppColors.lava,
-                              shape: BoxShape.circle,
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.3),
-                                  blurRadius: 4,
-                                  offset: const Offset(0, 2),
-                                ),
-                              ],
-                            ),
-                            child: const Icon(
-                              Icons.close,
-                              color: AppColors.white,
-                              size: 20,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: Image.file(file, fit: BoxFit.cover),
                   ),
                 );
               }
@@ -784,64 +753,6 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
     _pickAndUploadFromCamera();
   }
 
-  void _deletePhoto(int index) {
-    if (index < 0 || index >= _localPhotos.length) return;
-    
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(
-          'Delete Photo',
-          style: AppTypography.titleMedium.copyWith(
-            color: AppColors.textPrimary,
-          ),
-        ),
-        content: Text(
-          'Are you sure you want to delete this photo?',
-          style: AppTypography.bodyMedium.copyWith(
-            color: AppColors.textSecondary,
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: Text(
-              'Cancel',
-              style: AppTypography.buttonMedium.copyWith(
-                color: AppColors.textSecondary,
-              ),
-            ),
-          ),
-          TextButton(
-            onPressed: () {
-              setState(() {
-                _localPhotos.removeAt(index);
-                _imageUrls.removeAt(index);
-              });
-              Navigator.of(context).pop();
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(
-                    'Photo deleted',
-                    style: AppTypography.bodyMedium.copyWith(color: AppColors.white),
-                  ),
-                  backgroundColor: AppColors.forestGreen,
-                  duration: const Duration(seconds: 2),
-                ),
-              );
-            },
-            child: Text(
-              'Delete',
-              style: AppTypography.buttonMedium.copyWith(
-                color: AppColors.lava,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Future<void> _pickAndUploadFromCamera() async {
     try {
       final ImagePicker picker = ImagePicker();
@@ -850,40 +761,6 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
           preferredCameraDevice: CameraDevice.rear,
           imageQuality: 85);
       if (captured == null) return;
-
-      // Show loading indicator
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            children: [
-              const SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                ),
-              ),
-              const SizedBox(width: 16),
-              Text(
-                'Compressing image...',
-                style: AppTypography.bodyMedium.copyWith(color: AppColors.white),
-              ),
-            ],
-          ),
-          backgroundColor: AppColors.forestGreen,
-          duration: const Duration(seconds: 10),
-        ),
-      );
-
-      // ✅ Compress image in separate isolate (multi-threading)
-      // This runs on a separate thread and won't block the UI
-      final compressedBytes = await ImageProcessingService.compressImage(
-        imagePath: captured.path,
-        maxWidth: 1920,
-        quality: 85,
-      );
 
       // Upload to Firebase Storage under user ID folder
       final user = FirebaseAuth.instance.currentUser;
@@ -899,38 +776,17 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
         bucket: 'gs://travelappbd-8e204.firebasestorage.app',
       );
       final ref = storage.ref().child('experiences/$uid/$fileName');
-      
-      // Upload compressed bytes instead of raw file
-      final uploadTask = await ref.putData(
-        compressedBytes,
-        SettableMetadata(contentType: 'image/jpeg'),
-      );
+      final uploadTask =
+          await ref.putFile(file, SettableMetadata(contentType: 'image/jpeg'));
       final String downloadUrl = await uploadTask.ref.getDownloadURL();
 
       if (!mounted) return;
-      
-      // Hide loading indicator
-      ScaffoldMessenger.of(context).hideCurrentSnackBar();
-      
       setState(() {
         _localPhotos.add(file);
         _imageUrls.add(downloadUrl);
       });
-
-      // Show success message
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Photo added successfully',
-            style: AppTypography.bodyMedium.copyWith(color: AppColors.white),
-          ),
-          backgroundColor: AppColors.forestGreen,
-          duration: const Duration(seconds: 2),
-        ),
-      );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).hideCurrentSnackBar();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Failed to capture photo: $e'),
