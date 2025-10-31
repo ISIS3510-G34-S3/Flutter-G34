@@ -1,10 +1,9 @@
-import 'dart:io';
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../mock/mock_data.dart' as mock;
+import '../../services/image_processing_service.dart';
 import 'package:travel_connect/models/experience.dart';
 import 'package:travel_connect/services/experience_service.dart';
 import 'package:travel_connect/theme/colors.dart';
@@ -82,28 +81,97 @@ class _EditExperienceScreenState extends State<EditExperienceScreen> {
   }
 
   Future<void> _addPhoto() async {
-    final ImagePicker picker = ImagePicker();
-    final XFile? captured = await picker.pickImage(source: ImageSource.camera, preferredCameraDevice: CameraDevice.rear, imageQuality: 85);
-    if (captured == null) return;
+    try {
+      final ImagePicker picker = ImagePicker();
+      final XFile? captured = await picker.pickImage(
+        source: ImageSource.camera, 
+        preferredCameraDevice: CameraDevice.rear, 
+        imageQuality: 85
+      );
+      if (captured == null) return;
 
-    final String fileName = 'photo_${DateTime.now().millisecondsSinceEpoch}.jpg';
-    final File file = File(captured.path);
+      // Show loading indicator
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation<Color>(AppColors.white),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Text(
+                'Compressing image...',
+                style: AppTypography.bodyMedium.copyWith(color: AppColors.white),
+              ),
+            ],
+          ),
+          backgroundColor: AppColors.forestGreen,
+          duration: const Duration(seconds: 10),
+        ),
+      );
 
-    final storage = FirebaseStorage.instanceFor(
-      bucket: 'gs://travelappbd-8e204.firebasestorage.app',
-    );
-    final ref = storage.ref().child('experiences/${_experience?.hostId}/$fileName');
-    final uploadTask = await ref.putFile(file, SettableMetadata(contentType: 'image/jpeg'));
-    final String downloadUrl = await uploadTask.ref.getDownloadURL();
+      // ✅ Compress image in separate isolate (multi-threading)
+      final compressedBytes = await ImageProcessingService.compressImage(
+        imagePath: captured.path,
+        maxWidth: 1920,
+        quality: 85,
+      );
 
-    if (!mounted) return;
-    setState(() {
-      _imageUrls.add(downloadUrl);
-    });
+      final String fileName = 'photo_${DateTime.now().millisecondsSinceEpoch}.jpg';
 
-    await _service.updateExperience(widget.experienceId, {
-      'images': _imageUrls,
-    });
+      final storage = FirebaseStorage.instanceFor(
+        bucket: 'gs://travelappbd-8e204.firebasestorage.app',
+      );
+      final ref = storage.ref().child('experiences/${_experience?.hostId}/$fileName');
+      
+      // Upload compressed bytes instead of raw file
+      final uploadTask = await ref.putData(
+        compressedBytes,
+        SettableMetadata(contentType: 'image/jpeg'),
+      );
+      final String downloadUrl = await uploadTask.ref.getDownloadURL();
+
+      if (!mounted) return;
+      
+      // Hide loading indicator
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      
+      setState(() {
+        _imageUrls.add(downloadUrl);
+      });
+
+      await _service.updateExperience(widget.experienceId, {
+        'images': _imageUrls,
+      });
+
+      // Show success message
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Photo added successfully',
+            style: AppTypography.bodyMedium.copyWith(color: AppColors.white),
+          ),
+          backgroundColor: AppColors.forestGreen,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to add photo: $e'),
+          backgroundColor: AppColors.lava,
+        ),
+      );
+    }
   }
 
   Future<void> _removePhoto(String url) async {
@@ -119,6 +187,48 @@ class _EditExperienceScreenState extends State<EditExperienceScreen> {
       );
       return;
     }
+
+    // Show confirmation dialog
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(
+          'Delete Photo',
+          style: AppTypography.titleMedium.copyWith(
+            color: AppColors.textPrimary,
+          ),
+        ),
+        content: Text(
+          'Are you sure you want to delete this photo?',
+          style: AppTypography.bodyMedium.copyWith(
+            color: AppColors.textSecondary,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text(
+              'Cancel',
+              style: AppTypography.buttonMedium.copyWith(
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: Text(
+              'Delete',
+              style: AppTypography.buttonMedium.copyWith(
+                color: AppColors.lava,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
     try {
       final storage = FirebaseStorage.instanceFor(
         bucket: 'gs://travelappbd-8e204.firebasestorage.app',
@@ -134,6 +244,18 @@ class _EditExperienceScreenState extends State<EditExperienceScreen> {
     await _service.updateExperience(widget.experienceId, {
       'images': _imageUrls,
     });
+    
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'Photo deleted',
+          style: AppTypography.bodyMedium.copyWith(color: AppColors.white),
+        ),
+        backgroundColor: AppColors.forestGreen,
+        duration: const Duration(seconds: 2),
+      ),
+    );
   }
 
   Future<void> _save() async {
@@ -198,31 +320,42 @@ class _EditExperienceScreenState extends State<EditExperienceScreen> {
                       itemBuilder: (context, index) {
                         if (index < _imageUrls.length) {
                           final url = _imageUrls[index];
-                          return Stack(
-                            children: [
-                              AspectRatio(
-                                aspectRatio: 1,
-                                child: ClipRRect(
+                          return AspectRatio(
+                            aspectRatio: 1,
+                            child: Stack(
+                              children: [
+                                ClipRRect(
                                   borderRadius: BorderRadius.circular(8),
                                   child: Image.network(url, fit: BoxFit.cover),
                                 ),
-                              ),
-                              Positioned(
-                                right: 4,
-                                top: 4,
-                                child: InkWell(
-                                  onTap: () => _removePhoto(url),
-                                  child: Container(
-                                    decoration: BoxDecoration(
-                                      color: Colors.black54,
-                                      borderRadius: BorderRadius.circular(16),
+                                Positioned(
+                                  top: 4,
+                                  right: 4,
+                                  child: GestureDetector(
+                                    onTap: () => _removePhoto(url),
+                                    child: Container(
+                                      padding: const EdgeInsets.all(4),
+                                      decoration: BoxDecoration(
+                                        color: AppColors.lava,
+                                        shape: BoxShape.circle,
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: Colors.black.withOpacity(0.3),
+                                            blurRadius: 4,
+                                            offset: const Offset(0, 2),
+                                          ),
+                                        ],
+                                      ),
+                                      child: const Icon(
+                                        Icons.close,
+                                        color: AppColors.white,
+                                        size: 20,
+                                      ),
                                     ),
-                                    padding: const EdgeInsets.all(4),
-                                    child: const Icon(Icons.close, size: 18, color: Colors.white),
                                   ),
                                 ),
-                              )
-                            ],
+                              ],
+                            ),
                           );
                         }
                         return _buildAddPhotoButton();
