@@ -1,9 +1,11 @@
 import 'dart:io';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:path_provider/path_provider.dart';
 import '../../mock/mock_data.dart' as mock;
 import 'package:travel_connect/models/experience.dart';
 import 'package:travel_connect/services/experience_service.dart';
@@ -64,7 +66,8 @@ class _EditExperienceScreenState extends State<EditExperienceScreen> {
       _selectedCategories = List<String>.from(exp.categories);
       _selectedLanguages = List<String>.from(exp.languages);
       _selectedPaymentOptions = List<String>.from(exp.paymentOptions);
-      _selectedAccessibilityFeatures = List<String>.from(exp.accessibilityFeatures);
+      _selectedAccessibilityFeatures =
+          List<String>.from(exp.accessibilityFeatures);
       _imageUrls.addAll(exp.images);
       _geoPoint = exp.location;
       _department = exp.department;
@@ -82,28 +85,219 @@ class _EditExperienceScreenState extends State<EditExperienceScreen> {
   }
 
   Future<void> _addPhoto() async {
+    await _showMediaSourceDialog();
+  }
+
+  /// Show dialog to choose between camera and gallery
+  Future<void> _showMediaSourceDialog() async {
+    await showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          backgroundColor: AppColors.white,
+          title: Text(
+            'Add Photo',
+            style: AppTypography.titleMedium.copyWith(
+              color: AppColors.textPrimary,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppColors.forestGreen.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(
+                    Icons.camera_alt,
+                    color: AppColors.forestGreen,
+                    size: 24,
+                  ),
+                ),
+                title: Text(
+                  'Take Photo',
+                  style: AppTypography.bodyLarge.copyWith(
+                    color: AppColors.textPrimary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _pickAndUploadFromCamera();
+                },
+              ),
+              ListTile(
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppColors.oliveGold.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(
+                    Icons.photo_library,
+                    color: AppColors.oliveGold,
+                    size: 24,
+                  ),
+                ),
+                title: Text(
+                  'Choose from Gallery',
+                  style: AppTypography.bodyLarge.copyWith(
+                    color: AppColors.textPrimary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _pickAndUploadFromGallery();
+                },
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text(
+                'Cancel',
+                style: AppTypography.bodyLarge.copyWith(
+                  color: AppColors.textSecondary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _pickAndUploadFromCamera() async {
     final ImagePicker picker = ImagePicker();
-    final XFile? captured = await picker.pickImage(source: ImageSource.camera, preferredCameraDevice: CameraDevice.rear, imageQuality: 85);
+    final XFile? captured = await picker.pickImage(
+      source: ImageSource.camera,
+      preferredCameraDevice: CameraDevice.rear,
+      imageQuality: 85,
+    );
     if (captured == null) return;
 
-    final String fileName = 'photo_${DateTime.now().millisecondsSinceEpoch}.jpg';
-    final File file = File(captured.path);
+    await _saveAndUploadMedia(captured, isVideo: false);
+  }
 
-    final storage = FirebaseStorage.instanceFor(
-      bucket: 'gs://travelappbd-8e204.firebasestorage.app',
-    );
-    final ref = storage.ref().child('experiences/${_experience?.hostId}/$fileName');
-    final uploadTask = await ref.putFile(file, SettableMetadata(contentType: 'image/jpeg'));
-    final String downloadUrl = await uploadTask.ref.getDownloadURL();
+  Future<void> _pickAndUploadFromGallery() async {
+    try {
+      final ImagePicker picker = ImagePicker();
+      final XFile? picked = await picker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 85,
+      );
+      if (picked == null) return;
 
-    if (!mounted) return;
-    setState(() {
-      _imageUrls.add(downloadUrl);
-    });
+      await _saveAndUploadMedia(picked, isVideo: false);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to pick image: $e'),
+          backgroundColor: AppColors.lava,
+        ),
+      );
+    }
+  }
 
-    await _service.updateExperience(widget.experienceId, {
-      'images': _imageUrls,
-    });
+  /// Save media locally and upload to Firebase Storage
+  Future<void> _saveAndUploadMedia(XFile mediaFile,
+      {required bool isVideo}) async {
+    try {
+      // Get current user
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        throw Exception('No authenticated user');
+      }
+
+      // Save to Pictures/Travel Connect directory for easy user access
+      Directory? picturesDir;
+      if (Platform.isAndroid) {
+        // On Android, use external storage Pictures directory
+        final externalDirs = await getExternalStorageDirectories(
+            type: StorageDirectory.pictures);
+        if (externalDirs != null && externalDirs.isNotEmpty) {
+          // Use public Pictures directory
+          final basePath = externalDirs.first.path.split('/Android')[0];
+          picturesDir = Directory('$basePath/Pictures/Travel Connect');
+        }
+      } else if (Platform.isIOS) {
+        // On iOS, use app's documents directory (photos saved here can be accessed via Files app)
+        final appDir = await getApplicationDocumentsDirectory();
+        picturesDir = Directory('${appDir.path}/Travel Connect');
+      } else {
+        // Fallback for other platforms
+        final appDir = await getApplicationDocumentsDirectory();
+        picturesDir = Directory('${appDir.path}/Travel Connect');
+      }
+
+      if (picturesDir == null) {
+        throw Exception('Could not find storage directory');
+      }
+
+      if (!await picturesDir.exists()) {
+        await picturesDir.create(recursive: true);
+      }
+
+      final String uid = user.uid;
+      final String timestamp = DateTime.now().millisecondsSinceEpoch.toString();
+      final String extension = 'jpg';
+      final String fileName = 'photo_$timestamp.$extension';
+
+      // Copy to local storage
+      final localPath = '${picturesDir.path}/$fileName';
+      final File localFile = await File(mediaFile.path).copy(localPath);
+
+      // Upload to Firebase Storage using current user's UID
+      final storage = FirebaseStorage.instanceFor(
+        bucket: 'gs://travelappbd-8e204.firebasestorage.app',
+      );
+      final ref = storage.ref().child('experiences/$uid/$fileName');
+      final uploadTask = await ref.putFile(
+        localFile,
+        SettableMetadata(contentType: 'image/jpeg'),
+      );
+      final String downloadUrl = await uploadTask.ref.getDownloadURL();
+
+      if (!mounted) return;
+      setState(() {
+        _imageUrls.add(downloadUrl);
+      });
+
+      await _service.updateExperience(widget.experienceId, {
+        'images': _imageUrls,
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            isVideo
+                ? 'Video saved locally and uploaded!'
+                : 'Photo saved locally and uploaded!',
+          ),
+          backgroundColor: AppColors.forestGreen,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to save ${isVideo ? 'video' : 'photo'}: $e'),
+          backgroundColor: AppColors.lava,
+        ),
+      );
+    }
   }
 
   Future<void> _removePhoto(String url) async {
@@ -178,7 +372,9 @@ class _EditExperienceScreenState extends State<EditExperienceScreen> {
         actions: [
           TextButton(
             onPressed: _save,
-            child: Text('Save', style: AppTypography.buttonMedium.copyWith(color: AppColors.white)),
+            child: Text('Save',
+                style: AppTypography.buttonMedium
+                    .copyWith(color: AppColors.white)),
           )
         ],
       ),
@@ -189,19 +385,33 @@ class _EditExperienceScreenState extends State<EditExperienceScreen> {
               child: ListView(
                 padding: const EdgeInsets.all(16),
                 children: [
-                  Text('Photos', style: AppTypography.titleSmall.copyWith(color: AppColors.textPrimary)),
+                  Text('Photos & Videos',
+                      style: AppTypography.titleSmall
+                          .copyWith(color: AppColors.textPrimary)),
+                  const SizedBox(height: 4),
+                  Text(
+                    'First upload must be a photo',
+                    style: AppTypography.bodySmall.copyWith(
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
                   const SizedBox(height: 12),
                   SizedBox(
                     height: 120,
                     child: ListView.separated(
                       scrollDirection: Axis.horizontal,
                       itemBuilder: (context, index) {
-                        if (index < _imageUrls.length) {
-                          final url = _imageUrls[index];
+                        // Always show the "Add Photo" button first
+                        if (index == 0) {
+                          return _buildAddPhotoButton();
+                        }
+                        // Then show uploaded media
+                        if (index - 1 < _imageUrls.length) {
+                          final url = _imageUrls[index - 1];
                           return Stack(
                             children: [
-                              AspectRatio(
-                                aspectRatio: 1,
+                              Container(
+                                width: 120,
                                 child: ClipRRect(
                                   borderRadius: BorderRadius.circular(8),
                                   child: Image.network(url, fit: BoxFit.cover),
@@ -218,31 +428,43 @@ class _EditExperienceScreenState extends State<EditExperienceScreen> {
                                       borderRadius: BorderRadius.circular(16),
                                     ),
                                     padding: const EdgeInsets.all(4),
-                                    child: const Icon(Icons.close, size: 18, color: Colors.white),
+                                    child: const Icon(Icons.close,
+                                        size: 18, color: Colors.white),
                                   ),
                                 ),
                               )
                             ],
                           );
                         }
-                        return _buildAddPhotoButton();
+                        return const SizedBox.shrink();
                       },
-                      separatorBuilder: (_, __) => const SizedBox(width: 16),
-                      itemCount: (_imageUrls.length + 1).clamp(1, 8),
+                      separatorBuilder: (_, __) => const SizedBox(width: 12),
+                      itemCount: _imageUrls.length + 1,
                     ),
                   ),
                   const SizedBox(height: 24),
-                  _buildTextField('Experience Title', _titleController, validator: (v) => v == null || v.isEmpty ? 'Required' : null),
+                  _buildTextField('Experience Title', _titleController,
+                      validator: (v) =>
+                          v == null || v.isEmpty ? 'Required' : null),
                   const SizedBox(height: 20),
-                  _buildTextField('Description', _descriptionController, maxLines: 4, validator: (v) => v == null || v.isEmpty ? 'Required' : null),
+                  _buildTextField('Description', _descriptionController,
+                      maxLines: 4,
+                      validator: (v) =>
+                          v == null || v.isEmpty ? 'Required' : null),
                   const SizedBox(height: 20),
                   _buildCategoryMultiSelect(),
                   const SizedBox(height: 20),
-                  _buildTextField('Duration (hours)', _durationController, keyboardType: TextInputType.number, validator: _validateNonNegativeInt),
+                  _buildTextField('Duration (hours)', _durationController,
+                      keyboardType: TextInputType.number,
+                      validator: _validateNonNegativeInt),
                   const SizedBox(height: 20),
-                  _buildTextField('Price (COP)', _priceController, keyboardType: TextInputType.number, validator: _validateNonNegativeInt),
+                  _buildTextField('Price (COP)', _priceController,
+                      keyboardType: TextInputType.number,
+                      validator: _validateNonNegativeInt),
                   const SizedBox(height: 20),
-                  _buildTextField('Max Group Size', _groupSizeController, keyboardType: TextInputType.number, validator: _validateNonNegativeInt),
+                  _buildTextField('Max Group Size', _groupSizeController,
+                      keyboardType: TextInputType.number,
+                      validator: _validateNonNegativeInt),
                   const SizedBox(height: 20),
                   _buildChipsSection(
                     label: 'Languages',
@@ -317,9 +539,13 @@ class _EditExperienceScreenState extends State<EditExperienceScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.add_photo_alternate_outlined, size: 32, color: AppColors.textSecondary),
+            const Icon(Icons.add_photo_alternate_outlined,
+                size: 32, color: AppColors.textSecondary),
             const SizedBox(height: 8),
-            Text('Add Photo', style: AppTypography.bodyMedium.copyWith(color: AppColors.textSecondary)),
+            Text('Add\nPhoto',
+                textAlign: TextAlign.center,
+                style: AppTypography.bodyMedium
+                    .copyWith(color: AppColors.textSecondary)),
           ],
         ),
       ),
@@ -333,11 +559,16 @@ class _EditExperienceScreenState extends State<EditExperienceScreen> {
     return null;
   }
 
-  Widget _buildTextField(String label, TextEditingController controller, {int maxLines = 1, TextInputType? keyboardType, String? Function(String?)? validator}) {
+  Widget _buildTextField(String label, TextEditingController controller,
+      {int maxLines = 1,
+      TextInputType? keyboardType,
+      String? Function(String?)? validator}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: AppTypography.labelLarge.copyWith(color: AppColors.textPrimary, fontWeight: FontWeight.w600)),
+        Text(label,
+            style: AppTypography.labelLarge.copyWith(
+                color: AppColors.textPrimary, fontWeight: FontWeight.w600)),
         const SizedBox(height: 8),
         TextFormField(
           controller: controller,
@@ -418,5 +649,3 @@ class _EditExperienceScreenState extends State<EditExperienceScreen> {
     );
   }
 }
-
-
