@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -8,10 +10,11 @@ import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import '../../mock/mock_data.dart' as mock;
 import '../../services/image_processing_service.dart';
-import 'package:travel_connect/models/experience.dart';
 import 'package:travel_connect/services/experience_service.dart';
 import 'package:travel_connect/theme/colors.dart';
 import 'package:travel_connect/theme/typography.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:http/http.dart' as http;
 
 class EditExperienceScreen extends StatefulWidget {
   const EditExperienceScreen({super.key, required this.experienceId});
@@ -26,7 +29,6 @@ class _EditExperienceScreenState extends State<EditExperienceScreen> {
   final _formKey = GlobalKey<FormState>();
   final ExperienceService _service = ExperienceService();
 
-  Experience? _experience;
   bool _isLoading = true;
 
   // Controllers mirroring create screen
@@ -44,10 +46,24 @@ class _EditExperienceScreenState extends State<EditExperienceScreen> {
 
   GeoPoint? _geoPoint;
   String? _department;
+  final TextEditingController _locationController = TextEditingController();
+  List<Map<String, dynamic>> _placeSuggestions = [];
+  bool _isFetchingPlaces = false;
+  Timer? _placesDebounce;
+  bool _hasConnectivity = true;
+  String? _manualLocation;
+
+  static const String _placesApiKey = String.fromEnvironment(
+      'GOOGLE_PLACES_API_KEY',
+      defaultValue: 'AIzaSyA0TPkWq9uNvEA0Qhw2NVBihLbRTroYabE');
 
   @override
   void initState() {
     super.initState();
+    // Start monitoring connectivity for auto-sync
+    _service.startConnectivityMonitoring();
+    _checkInitialConnectivity();
+    _listenToConnectivity();
     _load();
   }
 
@@ -55,7 +71,6 @@ class _EditExperienceScreenState extends State<EditExperienceScreen> {
     final exp = await _service.getExperienceById(widget.experienceId);
     if (!mounted) return;
     setState(() {
-      _experience = exp;
       _isLoading = false;
     });
     if (exp != null) {
@@ -72,7 +87,53 @@ class _EditExperienceScreenState extends State<EditExperienceScreen> {
       _imageUrls.addAll(exp.images);
       _geoPoint = exp.location;
       _department = exp.department;
+      _locationController.text =
+          _department?.isNotEmpty == true ? _department! : '';
+      if (_locationController.text.isEmpty && _geoPoint != null) {
+        _locationController.text =
+            '${_geoPoint!.latitude.toStringAsFixed(4)}, ${_geoPoint!.longitude.toStringAsFixed(4)}';
+      }
+      try {
+        final doc = await FirebaseFirestore.instance
+            .collection('experiences')
+            .doc(widget.experienceId)
+            .get();
+        final manualText = doc.data()?['manualLocationText'] as String?;
+        if (manualText != null && manualText.isNotEmpty && mounted) {
+          setState(() {
+            _manualLocation = manualText;
+            _locationController.text = manualText;
+            _geoPoint = const GeoPoint(0, 0);
+          });
+        }
+      } catch (_) {
+        // ignore manual text lookup failures
+      }
     }
+  }
+
+  void _checkInitialConnectivity() async {
+    final hasInternet = await _service.hasConnectivity();
+    if (mounted) {
+      setState(() {
+        _hasConnectivity = hasInternet;
+      });
+    }
+  }
+
+  void _listenToConnectivity() {
+    _service.connectivity.onConnectivityChanged.listen((results) {
+      final isConnected =
+          results.any((result) => result != ConnectivityResult.none);
+      if (mounted) {
+        setState(() {
+          _hasConnectivity = isConnected;
+          if (isConnected) {
+            _manualLocation = null;
+          }
+        });
+      }
+    });
   }
 
   @override
@@ -82,6 +143,8 @@ class _EditExperienceScreenState extends State<EditExperienceScreen> {
     _durationController.dispose();
     _priceController.dispose();
     _groupSizeController.dispose();
+    _locationController.dispose();
+    _placesDebounce?.cancel();
     super.dispose();
   }
 
@@ -284,9 +347,13 @@ class _EditExperienceScreenState extends State<EditExperienceScreen> {
         _imageUrls.add(downloadUrl);
       });
 
-      await _service.updateExperience(widget.experienceId, {
-        'images': _imageUrls,
-      });
+      final wasOnline = await _service.updateExperienceOfflineCapable(
+        widget.experienceId,
+        {
+          'images': List<String>.from(_imageUrls),
+          'updatedAt': DateTime.now().toIso8601String(),
+        },
+      );
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -298,6 +365,17 @@ class _EditExperienceScreenState extends State<EditExperienceScreen> {
           backgroundColor: AppColors.forestGreen,
         ),
       );
+      if (!wasOnline && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Changes saved offline. Will sync when online.',
+              style: AppTypography.bodyMedium.copyWith(color: AppColors.white),
+            ),
+            backgroundColor: AppColors.forestGreen,
+          ),
+        );
+      }
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -334,33 +412,94 @@ class _EditExperienceScreenState extends State<EditExperienceScreen> {
     setState(() {
       _imageUrls.remove(url);
     });
-    await _service.updateExperience(widget.experienceId, {
-      'images': _imageUrls,
-    });
+    final wasOnline = await _service.updateExperienceOfflineCapable(
+      widget.experienceId,
+      {
+        'images': List<String>.from(_imageUrls),
+        'updatedAt': DateTime.now().toIso8601String(),
+      },
+    );
+
+    if (!mounted) return;
+    if (!wasOnline) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Changes saved offline. Will sync when online.',
+            style: AppTypography.bodyMedium.copyWith(color: AppColors.white),
+          ),
+          backgroundColor: AppColors.forestGreen,
+        ),
+      );
+    }
   }
 
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
+    final locationInput = _locationController.text.trim();
+    if (_geoPoint == null && locationInput.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Please provide a location',
+            style: AppTypography.bodyMedium.copyWith(color: AppColors.white),
+          ),
+          backgroundColor: AppColors.lava,
+        ),
+      );
+      return;
+    }
+
+    final bool usingManual = !_hasConnectivity ||
+        (_manualLocation != null && _manualLocation!.trim().isNotEmpty);
+    if (usingManual) {
+      _geoPoint = const GeoPoint(0, 0);
+      if (locationInput.isNotEmpty) {
+        _department = locationInput;
+      }
+    }
+
     final Map<String, dynamic> updates = {
       'title': _titleController.text.trim(),
       'summary': _descriptionController.text.trim(),
       'duration': int.tryParse(_durationController.text.trim()) ?? 0,
       'priceCOP': int.tryParse(_priceController.text.trim()) ?? 0,
       'groupSizeMax': int.tryParse(_groupSizeController.text.trim()) ?? 0,
-      'categories': _selectedCategories,
-      'languages': _selectedLanguages,
-      'paymentOptions': _selectedPaymentOptions,
-      'accessibilityFeatures': _selectedAccessibilityFeatures,
-      'images': _imageUrls,
+      'categories': List<String>.from(_selectedCategories),
+      'languages': List<String>.from(_selectedLanguages),
+      'paymentOptions': List<String>.from(_selectedPaymentOptions),
+      'accessibilityFeatures':
+          List<String>.from(_selectedAccessibilityFeatures),
+      'images': List<String>.from(_imageUrls),
       'department': _department ?? '',
-      'location': _geoPoint,
+      'updatedAt': DateTime.now().toIso8601String(),
+      'needsGeocoding': usingManual,
     };
-    await _service.updateExperience(widget.experienceId, updates);
+    if (_geoPoint != null) {
+      updates['location'] = {
+        'latitude': _geoPoint!.latitude,
+        'longitude': _geoPoint!.longitude,
+      };
+    }
+    if (locationInput.isNotEmpty) {
+      updates['manualLocationText'] = locationInput;
+    }
+
+    // Use offline-capable service method
+    final wasOnline = await _service.updateExperienceOfflineCapable(
+        widget.experienceId, updates);
+
     if (!mounted) return;
+    
+    // Show appropriate message based on connectivity
+    final message = wasOnline
+        ? 'Experience updated'
+        : 'Experience saved offline. Will sync when online.';
+    
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          'Experience updated',
+          message,
           style: AppTypography.bodyMedium.copyWith(color: AppColors.white),
         ),
         backgroundColor: AppColors.forestGreen,
@@ -475,6 +614,8 @@ class _EditExperienceScreenState extends State<EditExperienceScreen> {
                       keyboardType: TextInputType.number,
                       validator: _validateNonNegativeInt),
                   const SizedBox(height: 20),
+                  _buildLocationPicker(),
+                  const SizedBox(height: 20),
                   _buildChipsSection(
                     label: 'Languages',
                     options: const ['es', 'en', 'pt', 'fr'],
@@ -588,6 +729,167 @@ class _EditExperienceScreenState extends State<EditExperienceScreen> {
       ],
     );
   }
+
+  Widget _buildLocationPicker() {
+    final useManualMode = !_hasConnectivity || _placesApiKey.isEmpty;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Location',
+          style: AppTypography.labelLarge.copyWith(
+            color: AppColors.textPrimary,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 8),
+        TextFormField(
+          controller: _locationController,
+          decoration: InputDecoration(
+            hintText:
+                useManualMode ? 'Enter location (e.g., Bogotá)' : 'Search a place',
+            prefixIcon: Icon(useManualMode ? Icons.edit_location : Icons.search),
+          ),
+          onChanged: (value) {
+            if (useManualMode) {
+              setState(() {
+                _manualLocation = value.trim();
+                if (_manualLocation != null && _manualLocation!.isNotEmpty) {
+                  _geoPoint = const GeoPoint(0, 0);
+                }
+                _placeSuggestions = [];
+              });
+            } else {
+              _onPlaceQueryChanged(value);
+            }
+          },
+          validator: (value) {
+            if ((value ?? '').trim().isEmpty && _geoPoint == null) {
+              return 'Please provide a location';
+            }
+            return null;
+          },
+        ),
+        const SizedBox(height: 8),
+        if (!useManualMode && _isFetchingPlaces)
+          const LinearProgressIndicator(minHeight: 2),
+        if (!useManualMode && _placeSuggestions.isNotEmpty)
+          Container(
+            decoration: BoxDecoration(
+              color: AppColors.white,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: AppColors.divider),
+            ),
+            constraints: const BoxConstraints(maxHeight: 240),
+            child: ListView.builder(
+              shrinkWrap: true,
+              itemCount: _placeSuggestions.length,
+              itemBuilder: (context, index) {
+                final suggestion = _placeSuggestions[index];
+                return ListTile(
+                  dense: true,
+                  title: Text(
+                    (suggestion['description'] as String?) ?? '',
+                    style: AppTypography.bodyMedium
+                        .copyWith(color: AppColors.textPrimary),
+                  ),
+                  onTap: () async {
+                    final placeId = suggestion['place_id'] as String?;
+                    if (placeId != null) {
+                      final details = await _fetchPlaceDetails(placeId);
+                      if (!mounted) return;
+                      setState(() {
+                        _geoPoint = GeoPoint(
+                          (details['lat'] as num).toDouble(),
+                          (details['lng'] as num).toDouble(),
+                        );
+                        _department = details['department'] as String?;
+                        _locationController.text =
+                            suggestion['description'] as String? ?? '';
+                        _manualLocation = null;
+                        _placeSuggestions = [];
+                      });
+                    }
+                  },
+                );
+              },
+            ),
+          ),
+        if (useManualMode)
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Text(
+              'Enter location as text. GPS coordinates will be added when synced.',
+              style: AppTypography.bodySmall.copyWith(
+                color: AppColors.textSecondary,
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  void _onPlaceQueryChanged(String value) {
+    _placesDebounce?.cancel();
+    if (_placesApiKey.isEmpty) return;
+    if (value.trim().isEmpty) {
+      setState(() {
+        _placeSuggestions = [];
+      });
+      return;
+    }
+    _placesDebounce = Timer(const Duration(milliseconds: 350), () async {
+      setState(() {
+        _isFetchingPlaces = true;
+      });
+      final results = await _fetchPlaceSuggestions(value.trim());
+      if (!mounted) return;
+      setState(() {
+        _placeSuggestions = results;
+        _isFetchingPlaces = false;
+      });
+    });
+  }
+
+  Future<List<Map<String, dynamic>>> _fetchPlaceSuggestions(
+      String input) async {
+    final uri = Uri.parse(
+        'https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${Uri.encodeQueryComponent(input)}&types=geocode&key=$_placesApiKey');
+    final res = await http.get(uri);
+    if (res.statusCode != 200) return [];
+    final data = json.decode(res.body) as Map<String, dynamic>;
+    final preds = (data['predictions'] as List? ?? []).cast<Map>();
+    return preds.map((e) => Map<String, dynamic>.from(e)).toList();
+  }
+
+  Future<Map<String, dynamic>> _fetchPlaceDetails(String placeId) async {
+    final uri = Uri.parse(
+        'https://maps.googleapis.com/maps/api/place/details/json?place_id=$placeId&fields=geometry,address_components&key=$_placesApiKey');
+    final res = await http.get(uri);
+    if (res.statusCode != 200) {
+      return {'lat': 0.0, 'lng': 0.0, 'department': null};
+    }
+    final data = json.decode(res.body) as Map<String, dynamic>;
+    final result = (data['result'] as Map?) ?? {};
+    final loc = ((result['geometry'] as Map?)?['location'] as Map?) ?? {};
+    final comps = (result['address_components'] as List?)?.cast<Map>() ?? [];
+    String? admin1;
+    for (final c in comps) {
+      final types = (c['types'] as List?)?.cast<String>() ?? [];
+      if (types.contains('administrative_area_level_1')) {
+        admin1 = c['long_name'] as String?;
+        break;
+      }
+    }
+    return {
+      'lat': (loc['lat'] as num?)?.toDouble() ?? 0.0,
+      'lng': (loc['lng'] as num?)?.toDouble() ?? 0.0,
+      'department': admin1,
+    };
+  }
+
 
   Widget _buildCategoryMultiSelect() {
     return Column(
