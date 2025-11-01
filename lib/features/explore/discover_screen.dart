@@ -365,6 +365,25 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   }
 
   void _navigateToChatbot() {
+    // Check if online before navigating to chatbot
+    if (!_viewModel.isOnline) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Row(
+            children: [
+              Icon(Icons.cloud_off, color: Colors.white),
+              SizedBox(width: 12),
+              Expanded(
+                child: Text('No internet connection. The Travel Agent requires internet access.'),
+              ),
+            ],
+          ),
+          backgroundColor: Colors.red,
+          duration: Duration(seconds: 3),
+        ),
+      );
+      return;
+    }
     context.push('/chatbot');
   }
 
