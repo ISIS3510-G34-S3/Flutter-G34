@@ -110,27 +110,44 @@ class DiscoverViewModel extends ChangeNotifier {
 
   /// Fetch experiences from service
   Future<void> fetchExperiences({bool forceRefresh = false}) async {
-    if (_isRefreshing && !_isLoading)
+    if (_isRefreshing && !_isLoading) {
+      debugPrint('⚠️ Already refreshing, skipping duplicate request');
       return; // Prevent multiple simultaneous refreshes
+    }
 
     if (!_isLoading) {
       _isRefreshing = true;
+      debugPrint(
+          '🔄 ViewModel: Starting refresh (forceRefresh: $forceRefresh)');
       notifyListeners();
     }
 
     try {
+      debugPrint(
+          '📞 ViewModel: Calling service.getExperiences(forceRefresh: $forceRefresh)');
       final experiences =
           await _experienceService.getExperiences(forceRefresh: forceRefresh);
-      _allExperiences = experiences;
+      debugPrint(
+          '✅ ViewModel: Received ${experiences.length} experiences from service');
+
+      // Force new list instances to ensure change detection
+      _allExperiences = List.from(experiences);
       _filterExperiences();
+
+      debugPrint(
+          '✅ ViewModel: Filtered to ${_filteredExperiences.length} experiences');
+      debugPrint(
+          '📝 ViewModel: First 3 experience IDs: ${_filteredExperiences.take(3).map((e) => e.id).join(", ")}');
+
       _isLoading = false;
       _isRefreshing = false;
       notifyListeners();
+      debugPrint('✅ ViewModel: notifyListeners() called, UI should update');
     } catch (e) {
       _isLoading = false;
       _isRefreshing = false;
       notifyListeners();
-      debugPrint('Error fetching experiences: $e');
+      debugPrint('❌ ViewModel: Error fetching experiences: $e');
     }
   }
 
@@ -197,7 +214,8 @@ class DiscoverViewModel extends ChangeNotifier {
       });
     }
 
-    _filteredExperiences = experiences;
+    // Create a new list instance to ensure change detection
+    _filteredExperiences = List.from(experiences);
   }
 
   /// Update search query and filter

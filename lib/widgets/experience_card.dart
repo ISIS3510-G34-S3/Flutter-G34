@@ -72,24 +72,32 @@ class ExperienceCard extends StatelessWidget {
       ),
       child: experience.images.isNotEmpty
           ? ClipRRect(
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+              borderRadius:
+                  const BorderRadius.vertical(top: Radius.circular(12)),
               child: CachedNetworkImage(
                 imageUrl: experience.images.first,
                 fit: BoxFit.cover,
+                height: 180,
+                width: double.infinity,
                 placeholder: (context, url) => Container(
                   color: AppColors.peach.withOpacity(0.3),
-                  child: const Center(child: CircularProgressIndicator()),
+                  child: const Center(
+                    child: CircularProgressIndicator(),
+                  ),
                 ),
                 errorWidget: (context, url, error) => Container(
                   color: AppColors.peach.withOpacity(0.3),
-                  child: const Icon(Icons.broken_image, color: AppColors.textSecondary),
+                  child: const Center(
+                    child: Icon(Icons.error),
+                  ),
                 ),
               ),
             )
           : Container(
               decoration: BoxDecoration(
                 color: AppColors.peach.withOpacity(0.3),
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+                borderRadius:
+                    const BorderRadius.vertical(top: Radius.circular(12)),
               ),
               child: Center(
                 child: Column(

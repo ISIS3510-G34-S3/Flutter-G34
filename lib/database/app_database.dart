@@ -70,6 +70,13 @@ class AppDatabase extends _$AppDatabase {
   @override
   int get schemaVersion => 1;
 
+  @override
+  MigrationStrategy get migration => MigrationStrategy(
+        onCreate: (Migrator m) async {
+          await m.createAll();
+        },
+      );
+
   // ============================================
   // EXPERIENCE CRUD OPERATIONS
   // ============================================
@@ -175,6 +182,16 @@ class AppDatabase extends _$AppDatabase {
   // ============================================
   // UTILITY OPERATIONS
   // ============================================
+
+  /// Clear all experiences from the database
+  Future<void> clearAllExperiences() async {
+    await delete(experiences).go();
+  }
+
+  /// Clear all users from the database
+  Future<void> clearAllUsers() async {
+    await delete(users).go();
+  }
 
   /// Clear all data from the database (useful for logout or reset)
   Future<void> clearAllData() async {
