@@ -86,13 +86,32 @@ class Experience {
       }
     }
 
+    GeoPoint parseLocation(dynamic value) {
+      if (value is GeoPoint) {
+        return value;
+      }
+
+      if (value is Map) {
+        final latitude = value['latitude'] ?? value['lat'];
+        final longitude = value['longitude'] ?? value['lng'];
+
+        if (latitude is num && longitude is num) {
+          return GeoPoint(latitude.toDouble(), longitude.toDouble());
+        }
+      }
+
+      print(
+          'WARNING: Field "location" has unexpected value $value. Defaulting to (0,0).');
+      return const GeoPoint(0, 0);
+    }
+
     return Experience(
       id: doc.id,
       title: data['title'] ?? '',
       summary: data['summary'] ?? '',
       hostId: hostIdValue,
       hostVerified: parseBool(data['hostVerified'], false),
-      location: data['location'] as GeoPoint,
+      location: parseLocation(data['location']),
       department: data['department'] ?? '',
       avgRating: (data['avgRating'] as num?)?.toDouble() ?? 0.0,
       reviewsCount: data['reviewsCount'] ?? 0,
@@ -101,7 +120,7 @@ class Experience {
       skillsToTeach: parseStringList(data['skillsToTeach'], 'skillsToTeach'),
       categories: parseStringList(data['categories'], 'categories'),
       languages: parseStringList(data['languages'], 'languages'),
-      createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      createdAt: _parseTimestamp(data['createdAt']) ?? DateTime.now(),
       priceCOP: data['priceCOP'] ?? 0,
       groupSizeMax: data['groupSizeMax'] ?? 0,
       paymentOptions: parseStringList(data['paymentOptions'], 'paymentOptions'),
@@ -109,5 +128,19 @@ class Experience {
       isActive: parseBool(data['isActive'], false),
       accessibilityFeatures: parseStringList(data['accessibilityFeatures'], 'accessibilityFeatures'),
     );
+  }
+
+  static DateTime? _parseTimestamp(dynamic value) {
+    try {
+      if (value is Timestamp) {
+        return value.toDate();
+      }
+      if (value is String) {
+        return DateTime.tryParse(value);
+      }
+    } catch (e) {
+      print('WARNING: Failed to parse timestamp "$value": $e');
+    }
+    return null;
   }
 }

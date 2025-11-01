@@ -1158,6 +1158,7 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
         'department': department,
         'duration': duration,
         'hostId': hostDocId, // Store as string for offline compatibility
+        'hostDocId': hostDocId,
         'hostVerified': (hostData['isVerified'] ?? false) as bool,
         'avgRating': 0,
         'reviewsCount': 0,
