@@ -25,6 +25,7 @@ class ExperienceService {
   final Connectivity connectivity = Connectivity(); // Made public for listening
   StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
   bool _isSyncing = false;
+  final Set<String> _hostMetadataEnsured = <String>{};
 
   /// Get experiences with offline-first strategy:
   /// 1. Try Firebase Cache (in-memory, fastest)
@@ -425,13 +426,50 @@ class ExperienceService {
     final DocumentReference hostRef =
         _firestore.collection('users').doc(hostDocId);
 
+    if (!_hostMetadataEnsured.contains(hostDocId)) {
+      _hostMetadataEnsured.add(hostDocId);
+      unawaited(_ensureHostMetadata(hostDocId, hostRef));
+    }
+
     return _firestore
         .collection('experiences')
-        .where('hostId', isEqualTo: hostRef)
+        .where('hostDocId', isEqualTo: hostDocId)
         .snapshots()
         .map((snapshot) => snapshot.docs
             .map((doc) => models.Experience.fromFirestore(doc))
             .toList());
+  }
+
+  Future<void> _ensureHostMetadata(
+      String hostDocId, DocumentReference hostRef) async {
+    if (!await hasConnectivity()) return;
+
+    try {
+      final stringSnapshot = await _firestore
+          .collection('experiences')
+          .where('hostId', isEqualTo: hostDocId)
+          .get();
+
+      for (final doc in stringSnapshot.docs) {
+        await doc.reference.update({
+          'hostId': hostRef,
+          'hostDocId': hostDocId,
+        });
+      }
+
+      final refSnapshot = await _firestore
+          .collection('experiences')
+          .where('hostId', isEqualTo: hostRef)
+          .get();
+
+      for (final doc in refSnapshot.docs) {
+        if (!(doc.data().containsKey('hostDocId'))) {
+          await doc.reference.update({'hostDocId': hostDocId});
+        }
+      }
+    } catch (e) {
+      print('⚠️ Failed to ensure host metadata for $hostDocId: $e');
+    }
   }
 
   /// Update an experience document by id. Automatically updates updatedAt.
@@ -570,14 +608,38 @@ class ExperienceService {
 
     if (isOnline) {
       try {
-        // Try to save directly to Firebase
+        final Map<String, dynamic> onlineData =
+            Map<String, dynamic>.from(experienceData);
+
+        final hostIdValue = onlineData['hostId'];
+        if (hostIdValue is String && hostIdValue.isNotEmpty) {
+          final hostRef = _firestore.collection('users').doc(hostIdValue);
+          onlineData['hostId'] = hostRef;
+          onlineData['hostDocId'] ??= hostIdValue;
+        }
+
+        final locationValue = onlineData['location'];
+        if (locationValue is Map) {
+          final latitude = (locationValue['latitude'] ?? locationValue['lat']);
+          final longitude =
+              (locationValue['longitude'] ?? locationValue['lng']);
+          if (latitude is num && longitude is num) {
+            onlineData['location'] = GeoPoint(
+              latitude.toDouble(),
+              longitude.toDouble(),
+            );
+          }
+        }
+
+        onlineData['createdAt'] = FieldValue.serverTimestamp();
+        onlineData['updatedAt'] = FieldValue.serverTimestamp();
+
         final docRef =
-            await _firestore.collection('experiences').add(experienceData);
+            await _firestore.collection('experiences').add(onlineData);
         print('✓ Experience created online: ${docRef.id}');
         return docRef.id;
       } catch (e) {
         print('❌ Failed to create experience online: $e');
-        // Fall through to offline queue
       }
     }
 
