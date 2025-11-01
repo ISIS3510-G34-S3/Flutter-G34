@@ -4,6 +4,7 @@ import '../../theme/colors.dart';
 import '../../theme/typography.dart';
 import '../../mock/mock_data.dart';
 import '../../services/image_processing_service.dart';
+import '../../services/experience_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:convert';
@@ -14,6 +15,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/services.dart' as services;
 import 'package:path_provider/path_provider.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 
 /// Create experience screen with form for adding new experiences
 class CreateExperienceScreen extends StatefulWidget {
@@ -25,6 +27,7 @@ class CreateExperienceScreen extends StatefulWidget {
 
 class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
   final _formKey = GlobalKey<FormState>();
+  final ExperienceService _experienceService = ExperienceService();
   final _titleController = TextEditingController();
   final _descriptionController = TextEditingController();
   final _durationController = TextEditingController();
@@ -44,6 +47,8 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
   String? _selectedLocationLabel;
   String? _selectedDepartment;
   bool _isLoading = false;
+  String? _manualLocation;
+  bool _hasConnectivity = true;
 
   static const List<String> _languageOptions = ['es', 'en', 'pt', 'fr'];
   static const List<String> _paymentOptions = ['cash', 'card'];
@@ -65,6 +70,36 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
   List<Map<String, dynamic>> _placeSuggestions = [];
   bool _isFetchingPlaces = false;
   Timer? _placesDebounce;
+
+  @override
+  void initState() {
+    super.initState();
+    // Start monitoring connectivity for auto-sync
+    _experienceService.startConnectivityMonitoring();
+    _checkInitialConnectivity();
+    _listenToConnectivity();
+  }
+
+  void _checkInitialConnectivity() async {
+    final hasInternet = await _experienceService.hasConnectivity();
+    if (mounted) {
+      setState(() {
+        _hasConnectivity = hasInternet;
+      });
+    }
+  }
+
+  void _listenToConnectivity() {
+    _experienceService.connectivity.onConnectivityChanged.listen((results) {
+      final isConnected = results.isNotEmpty &&
+          results.any((result) => result != ConnectivityResult.none);
+      if (mounted) {
+        setState(() {
+          _hasConnectivity = isConnected;
+        });
+      }
+    });
+  }
 
   @override
   void dispose() {
@@ -614,6 +649,9 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
   // removed image URLs manual input; URLs are added automatically after upload
 
   Widget _buildLocationPicker() {
+    // Use manual mode when offline or no API key
+    final useManualMode = !_hasConnectivity || _placesApiKey.isEmpty;
+    
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -625,21 +663,34 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
           ),
         ),
         const SizedBox(height: 8),
-        TextField(
+        TextFormField(
           controller: _locationSearchController,
           decoration: InputDecoration(
-            hintText: 'Search a place',
-            prefixIcon: const Icon(Icons.search),
-            suffixIcon: IconButton(
-              icon: const Icon(Icons.place_outlined),
-              onPressed: () => _openPlacesSearch(),
-            ),
+            hintText: useManualMode 
+                ? 'Enter location (e.g., Salento, Quindío)'
+                : 'Search a place',
+            prefixIcon: Icon(useManualMode ? Icons.edit_location : Icons.search),
           ),
-          onChanged: _onPlaceQueryChanged,
+          onChanged: (value) {
+            if (useManualMode) {
+              setState(() {
+                _manualLocation = value.trim();
+              });
+            } else {
+              _onPlaceQueryChanged(value);
+            }
+          },
+          validator: (value) {
+            if (value == null || value.trim().isEmpty) {
+              return 'Please enter a location';
+            }
+            return null;
+          },
         ),
         const SizedBox(height: 8),
-        if (_isFetchingPlaces) const LinearProgressIndicator(minHeight: 2),
-        if (_placeSuggestions.isNotEmpty)
+        if (!useManualMode && _isFetchingPlaces) 
+          const LinearProgressIndicator(minHeight: 2),
+        if (!useManualMode && _placeSuggestions.isNotEmpty)
           Container(
             decoration: BoxDecoration(
               color: AppColors.white,
@@ -673,11 +724,23 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
                             _selectedLocationLabel ?? '';
                         _selectedDepartment = details['department'] as String?;
                         _placeSuggestions = [];
+                        _manualLocation = null; // Clear manual mode
                       });
                     }
                   },
                 );
               },
+            ),
+          ),
+        if (useManualMode)
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Text(
+              'Enter location as text. GPS coordinates will be added when synced.',
+              style: AppTypography.bodySmall.copyWith(
+                color: AppColors.textSecondary,
+                fontStyle: FontStyle.italic,
+              ),
             ),
           ),
       ],
@@ -704,56 +767,6 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
         _isFetchingPlaces = false;
       });
     });
-  }
-
-  Future<void> _openPlacesSearch() async {
-    if (_placesApiKey.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Provide GOOGLE_PLACES_API_KEY to enable place search',
-            style: AppTypography.bodyMedium.copyWith(color: AppColors.white),
-          ),
-          backgroundColor: AppColors.lava,
-        ),
-      );
-      return;
-    }
-    final input = _locationSearchController.text.trim();
-    if (input.isEmpty) return;
-
-    final suggestions = await _fetchPlaceSuggestions(input);
-    if (!mounted) return;
-    await showModalBottomSheet(
-      context: context,
-      builder: (context) => ListView(
-        children: suggestions
-            .map((s) => ListTile(
-                  title: Text(
-                    s['description'] as String? ?? '',
-                    style: AppTypography.bodyMedium
-                        .copyWith(color: AppColors.textPrimary),
-                  ),
-                  onTap: () async {
-                    final placeId = s['place_id'] as String?;
-                    if (placeId != null) {
-                      final details = await _fetchPlaceDetails(placeId);
-                      if (!mounted) return;
-                      setState(() {
-                        _selectedGeoPoint =
-                            GeoPoint(details['lat']!, details['lng']!);
-                        _selectedLocationLabel = s['description'] as String?;
-                        _locationSearchController.text =
-                            _selectedLocationLabel ?? '';
-                        _placeSuggestions = [];
-                      });
-                    }
-                    if (mounted) Navigator.of(context).pop();
-                  },
-                ))
-            .toList(),
-      ),
-    );
   }
 
   Future<List<Map<String, dynamic>>> _fetchPlaceSuggestions(
@@ -983,33 +996,75 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
       final File localFile = File(localPath);
       await localFile.writeAsBytes(compressedBytes);
 
-      // Upload to Firebase Storage
-      final storage = FirebaseStorage.instanceFor(
-        bucket: 'gs://travelappbd-8e204.firebasestorage.app',
-      );
-      final ref = storage.ref().child('experiences/$uid/$fileName');
-      final uploadTask = await ref.putData(
-        compressedBytes,
-        SettableMetadata(contentType: isVideo ? 'video/mp4' : 'image/jpeg'),
-      );
-      final String downloadUrl = await uploadTask.ref.getDownloadURL();
+      // Check connectivity before uploading to Firebase
+      final hasInternet = await _experienceService.hasConnectivity();
 
-      if (!mounted) return;
-      setState(() {
-        _localPhotos.add(localFile);
-        _imageUrls.add(downloadUrl);
-      });
+      if (hasInternet) {
+        try {
+          // Upload to Firebase Storage
+          final storage = FirebaseStorage.instanceFor(
+            bucket: 'gs://travelappbd-8e204.firebasestorage.app',
+          );
+          final ref = storage.ref().child('experiences/$uid/$fileName');
+          final uploadTask = await ref.putData(
+            compressedBytes,
+            SettableMetadata(contentType: isVideo ? 'video/mp4' : 'image/jpeg'),
+          );
+          final String downloadUrl = await uploadTask.ref.getDownloadURL();
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            isVideo
-                ? 'Video saved locally and uploaded!'
-                : 'Photo saved locally and uploaded!',
+          if (!mounted) return;
+          setState(() {
+            _localPhotos.add(localFile);
+            _imageUrls.add(downloadUrl);
+          });
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                isVideo
+                    ? 'Video saved locally and uploaded!'
+                    : 'Photo saved locally and uploaded!',
+              ),
+              backgroundColor: AppColors.forestGreen,
+            ),
+          );
+        } catch (e) {
+          print('⚠️ Failed to upload to Firebase, saving locally only: $e');
+          // If upload fails, save locally only (handled below)
+          if (!mounted) return;
+          setState(() {
+            _localPhotos.add(localFile);
+          });
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                isVideo
+                    ? 'Video saved locally (offline)'
+                    : 'Photo saved locally (offline)',
+              ),
+              backgroundColor: AppColors.oliveGold,
+            ),
+          );
+        }
+      } else {
+        // No internet - save locally only
+        if (!mounted) return;
+        setState(() {
+          _localPhotos.add(localFile);
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              isVideo
+                  ? 'Video saved locally (offline)'
+                  : 'Photo saved locally (offline)',
+            ),
+            backgroundColor: AppColors.oliveGold,
           ),
-          backgroundColor: AppColors.forestGreen,
-        ),
-      );
+        );
+      }
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1031,9 +1086,13 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
     });
 
     try {
-      if (_selectedGeoPoint == null) {
-        throw Exception('Please pick a location');
+      // Validate location
+      if (_selectedGeoPoint == null && 
+          (_manualLocation == null || _manualLocation!.isEmpty) &&
+          _locationSearchController.text.trim().isEmpty) {
+        throw Exception('Please enter a location');
       }
+      
       if (_selectedCategories.isEmpty) {
         throw Exception('Please select at least one category');
       }
@@ -1051,10 +1110,19 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
       final hostDocId = (authUser.email ?? '').toLowerCase().isNotEmpty
           ? (authUser.email ?? '').toLowerCase()
           : authUser.uid;
-      final hostRef =
-          FirebaseFirestore.instance.collection('users').doc(hostDocId);
-      final hostSnap = await hostRef.get();
-      final hostData = hostSnap.data() ?? <String, dynamic>{};
+      
+      // Fetch host data only if online
+      Map<String, dynamic> hostData = {'isVerified': false}; // Default
+      if (_hasConnectivity) {
+        try {
+          final hostRef =
+              FirebaseFirestore.instance.collection('users').doc(hostDocId);
+          final hostSnap = await hostRef.get();
+          hostData = hostSnap.data() ?? {'isVerified': false};
+        } catch (e) {
+          print('⚠️ Failed to fetch host data: $e');
+        }
+      }
 
       final String title = _titleController.text.trim();
       final String summary = _descriptionController.text.trim();
@@ -1076,13 +1144,20 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
       final int groupSizeMax =
           int.tryParse(_groupSizeController.text.trim()) ?? 0;
 
+      // Use GeoPoint if available, otherwise use placeholder (0,0) for manual location
+      final GeoPoint locationGeoPoint = _selectedGeoPoint ?? const GeoPoint(0, 0);
+      
+      // Determine location text: use manual input or selected label
+      final locationText = _manualLocation ?? 
+                          _locationSearchController.text.trim();
+      
       final Map<String, dynamic> experience = {
         'title': title,
         'summary': summary,
         'categories': categories,
         'department': department,
         'duration': duration,
-        'hostId': hostRef,
+        'hostId': hostDocId, // Store as string for offline compatibility
         'hostVerified': (hostData['isVerified'] ?? false) as bool,
         'avgRating': 0,
         'reviewsCount': 0,
@@ -1093,7 +1168,10 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
         'images': _imageUrls,
         'isActive': true,
         'accessibilityFeatures': _selectedAccessibilityFeatures,
-        'location': _selectedGeoPoint,
+        'location': {
+          'latitude': locationGeoPoint.latitude,
+          'longitude': locationGeoPoint.longitude,
+        }, // Store as map for offline compatibility
         'skillsToTeach': skillsToTeach.isEmpty
             ? <String>[_skillsToTeachController.text.trim()]
                 .where((e) => e.isNotEmpty)
@@ -1104,13 +1182,25 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
                 .where((e) => e.isNotEmpty)
                 .toList()
             : skillsToLearn,
-        'createdAt': FieldValue.serverTimestamp(),
-        'updatedAt': FieldValue.serverTimestamp(),
+        'createdAt': DateTime.now().toIso8601String(), // Use ISO string for offline
+        'updatedAt': DateTime.now().toIso8601String(),
       };
 
-      await FirebaseFirestore.instance
-          .collection('experiences')
-          .add(experience);
+      // Add manual location text if no precise GeoPoint
+      if (_selectedGeoPoint == null && locationText.isNotEmpty) {
+        experience['manualLocationText'] = locationText;
+        experience['needsGeocoding'] = true; // Flag for later geocoding
+      }
+
+      // Get local image paths that haven't been uploaded yet
+      final localImagePaths = _localPhotos
+          .map((file) => file.path)
+          .toList();
+
+      // Use offline-capable service method
+      final experienceId =
+          await _experienceService.createExperienceOfflineCapable(
+              experience, localImagePaths);
 
       if (!mounted) return;
 
@@ -1121,11 +1211,15 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
       // Navigate to My Experiences screen
       context.go('/my-experiences');
 
-      // Show success message after navigation
+      // Show appropriate success message
+      final message = experienceId != null
+          ? 'Experience created successfully!'
+          : 'Experience saved offline. Will sync when online.';
+      
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'Experience created successfully!',
+            message,
             style: AppTypography.bodyMedium.copyWith(color: AppColors.white),
           ),
           backgroundColor: AppColors.forestGreen,
