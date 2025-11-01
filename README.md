@@ -14,6 +14,7 @@ TravelConnect is a mobile application that allows users to discover, share, and 
 - **Create Experiences**: Share your own cultural adventures with photo uploads
 - **Detailed Experience Views**: Comprehensive information including pricing, categories, host profiles, and reviews
 - **User Profiles**: Personalized user profiles and experience management
+- **Profile Picture Upload**: Upload, update, and remove profile pictures with automatic optimization
 - **Photo Galleries**: Swipeable image galleries for experiences
 - **Modern UI**: Material Design 3 with custom theming and responsive layouts
 - **Offline-First Architecture**: Full offline support with local SQLite database using Drift
@@ -23,6 +24,7 @@ TravelConnect is a mobile application that allows users to discover, share, and 
 - **Pull-to-Refresh**: Swipe down to manually refresh experiences from server
 - **Multi-Currency Support**: Choose your preferred currency with daily exchange rate updates
 - **Smart Price Display**: Automatic conversion of all prices to selected currency
+- **Local Media Storage**: All photos (profile and experience) saved to accessible "Travel Connect" folder
 
 ## 🏗️ Project Structure
 
@@ -47,6 +49,8 @@ lib/
 ├── services/              # Business logic & data services
 │   ├── experience_service.dart  # Experience data with offline-first
 │   ├── host_service.dart        # User/Host data with offline-first
+│   ├── profile_picture_service.dart # Profile picture upload & storage
+│   ├── image_processing_service.dart # Image compression with isolates
 │   ├── currency_service.dart    # Currency preferences & exchange rates
 │   └── connectivity_service.dart # Network monitoring
 ├── theme/                 # Design system
@@ -391,6 +395,17 @@ For more information about Flutter development, visit the [Flutter documentation
 
 ## 🎯 Recent Enhancements
 
+### Profile Picture Management
+
+- **Upload from Camera or Gallery**: Take a new photo or select from existing images
+- **Image Optimization**: Automatic compression and resizing (1024x1024) for optimal performance
+- **Local Storage**: Profile pictures saved to "Travel Connect" folder alongside experience photos
+- **Firebase Integration**: Uploaded to Firebase Storage under `experiences/{userId}/` (uses same security rules as experience photos)
+- **Remove Picture**: Option to delete profile picture with confirmation
+- **Real-time Updates**: Instant UI refresh showing new profile picture
+- **Offline Support**: Profile picture URLs cached in local database for offline access
+- **Multi-threaded Processing**: Image compression runs in isolates to avoid UI blocking
+
 ### Experience Detail Screen
 
 - **Comprehensive Information Display**: Added price formatting (e.g., "120K COP"), duration, max group size, and categories
@@ -515,9 +530,32 @@ dart run build_runner watch --delete-conflicting-outputs
 - `lib/database/database_converters.dart` — Model conversion utilities
 - `lib/services/experience_service.dart` — Experience data service with offline-first
 - `lib/services/host_service.dart` — User/Host data service with offline-first
+- `lib/services/profile_picture_service.dart` — Profile picture upload and management
+- `lib/services/image_processing_service.dart` — Image compression using isolates
 - `lib/firebase_options.dart` — Generated Firebase config
 - `android/app/google-services.json` — Android Firebase config
 - `build.yaml` — Drift code generation configuration
+
+### Local Media Storage Locations
+
+**Android**: `/storage/emulated/0/Pictures/Travel Connect/`
+
+- Profile pictures: `profile_{userId}_{timestamp}.jpg`
+- Experience photos: `photo_{timestamp}.jpg`
+
+**iOS**: `<AppDocuments>/Travel Connect/`
+
+- Same naming convention as Android
+
+**Other Platforms**: `<AppDocuments>/Travel Connect/`
+
+All uploaded images are automatically:
+
+- Compressed using multi-threaded isolates
+- Resized to optimal dimensions (profile: 1024x1024, experiences: 1920px width)
+- Saved locally for offline access
+- Uploaded to Firebase Storage
+- Referenced in Firestore and local SQLite database
 
 ## ✅ Project notes / gotchas
 
