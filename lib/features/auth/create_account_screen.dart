@@ -8,6 +8,7 @@ import 'package:flutter/services.dart' as services;
 import 'package:flutter/foundation.dart' show kIsWeb;
 import '../../theme/colors.dart';
 import '../../theme/typography.dart';
+import '../../services/connectivity_service.dart';
 import 'app_regex.dart';
 
 /// Create account screen with user type selection and form fields
@@ -24,6 +25,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
+  final ConnectivityService _connectivityService = ConnectivityService();
 
   String _selectedUserType = 'Traveler';
   bool _isLoading = false;
@@ -632,6 +634,29 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
       return;
     }
 
+    // Check connectivity before attempting account creation
+    final isOnline = await _connectivityService.checkConnectivity();
+    if (!isOnline) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Row(
+            children: [
+              Icon(Icons.cloud_off, color: Colors.white),
+              SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                    'No internet connection. Please check your network and try again.'),
+              ),
+            ],
+          ),
+          backgroundColor: AppColors.lava,
+          duration: Duration(seconds: 3),
+        ),
+      );
+      return;
+    }
+
     setState(() {
       _isLoading = true;
     });
@@ -700,6 +725,29 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
   }
 
   Future<void> _handleGoogleSignUp() async {
+    // Check connectivity before attempting Google sign-up
+    final isOnline = await _connectivityService.checkConnectivity();
+    if (!isOnline) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Row(
+            children: [
+              Icon(Icons.cloud_off, color: Colors.white),
+              SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                    'No internet connection. Please check your network and try again.'),
+              ),
+            ],
+          ),
+          backgroundColor: AppColors.lava,
+          duration: Duration(seconds: 3),
+        ),
+      );
+      return;
+    }
+
     setState(() {
       _isLoading = true;
     });

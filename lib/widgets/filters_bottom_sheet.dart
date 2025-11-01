@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../theme/colors.dart';
 import '../theme/typography.dart';
 import '../models/experience.dart';
+import '../services/currency_service.dart';
 
 /// Filters bottom sheet for the discover screen
 class FiltersBottomSheet extends StatefulWidget {
@@ -354,12 +356,9 @@ class _FiltersBottomSheetState extends State<FiltersBottomSheet> {
 
   /// Format price for display (e.g., 150000 -> 150K)
   String _formatPrice(double price) {
-    if (price >= 1000000) {
-      return '${(price / 1000000).toStringAsFixed(1)}M';
-    } else if (price >= 1000) {
-      return '${(price / 1000).toStringAsFixed(0)}K';
-    }
-    return price.toStringAsFixed(0);
+    final currencyService =
+        Provider.of<CurrencyService>(context, listen: false);
+    return currencyService.formatPriceCompact(price.toInt());
   }
 
   Widget _buildLanguageCheckboxes() {

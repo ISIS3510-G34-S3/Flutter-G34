@@ -561,6 +561,11 @@ class ProfileScreen extends StatelessWidget {
               onTap: () => _showComingSoonDialog(context, 'Language & Region'),
             ),
             _buildSettingItem(
+              icon: Icons.attach_money_outlined,
+              title: 'Currency Preferences',
+              onTap: () => context.push('/currency-settings'),
+            ),
+            _buildSettingItem(
               icon: Icons.help_outline,
               title: 'Help & Support',
               onTap: () => _showComingSoonDialog(context, 'Help & Support'),

@@ -4,6 +4,7 @@ import 'package:travel_connect/models/experience.dart';
 import 'package:travel_connect/services/experience_service.dart';
 import '../../theme/colors.dart';
 import '../../theme/typography.dart';
+import '../../widgets/currency_price.dart';
 
 /// Booking screen for scheduling an experience
 class BookingScreen extends StatefulWidget {
@@ -136,23 +137,23 @@ class _BookingScreenState extends State<BookingScreen> {
                   _buildSectionTitle('Select Date'),
                   const SizedBox(height: 12),
                   _buildCalendar(),
-                  
+
                   const SizedBox(height: 24),
-                  
+
                   // Select Time
                   _buildSectionTitle('Select Time'),
                   const SizedBox(height: 12),
                   _buildTimeSlots(),
-                  
+
                   const SizedBox(height: 24),
-                  
+
                   // Number of Guests
                   _buildSectionTitle('Number of Guests'),
                   const SizedBox(height: 12),
                   _buildGuestSelector(),
-                  
+
                   const SizedBox(height: 24),
-                  
+
                   // Booking Summary
                   _buildSectionTitle('Booking Summary'),
                   const SizedBox(height: 12),
@@ -195,7 +196,8 @@ class _BookingScreenState extends State<BookingScreen> {
               IconButton(
                 onPressed: () {
                   setState(() {
-                    currentMonth = DateTime(currentMonth.year, currentMonth.month - 1);
+                    currentMonth =
+                        DateTime(currentMonth.year, currentMonth.month - 1);
                   });
                 },
                 icon: const Icon(Icons.chevron_left),
@@ -212,14 +214,15 @@ class _BookingScreenState extends State<BookingScreen> {
               IconButton(
                 onPressed: () {
                   setState(() {
-                    currentMonth = DateTime(currentMonth.year, currentMonth.month + 1);
+                    currentMonth =
+                        DateTime(currentMonth.year, currentMonth.month + 1);
                   });
                 },
                 icon: const Icon(Icons.chevron_right),
               ),
             ],
           ),
-          
+
           // Calendar grid
           Column(
             children: [
@@ -254,28 +257,29 @@ class _BookingScreenState extends State<BookingScreen> {
                   if (dayData == null) {
                     return const SizedBox();
                   }
-                  
+
                   final date = dayData['date'] as DateTime;
                   final day = dayData['day'] as int;
                   final isCurrentMonth = dayData['isCurrentMonth'] as bool;
-                  final isSelected = selectedDate != null && 
+                  final isSelected = selectedDate != null &&
                       selectedDate!.year == date.year &&
                       selectedDate!.month == date.month &&
                       selectedDate!.day == date.day;
-                  final isPastDate = date.isBefore(DateTime.now().subtract(const Duration(days: 1)));
-                  
+                  final isPastDate = date.isBefore(
+                      DateTime.now().subtract(const Duration(days: 1)));
+
                   return GestureDetector(
-                    onTap: isPastDate || !isCurrentMonth ? null : () {
-                      setState(() {
-                        selectedDate = date;
-                      });
-                    },
+                    onTap: isPastDate || !isCurrentMonth
+                        ? null
+                        : () {
+                            setState(() {
+                              selectedDate = date;
+                            });
+                          },
                     child: Container(
                       margin: const EdgeInsets.all(2),
                       decoration: BoxDecoration(
-                        color: isSelected 
-                            ? AppColors.lava 
-                            : Colors.transparent,
+                        color: isSelected ? AppColors.lava : Colors.transparent,
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Center(
@@ -285,9 +289,12 @@ class _BookingScreenState extends State<BookingScreen> {
                             color: isSelected
                                 ? AppColors.white
                                 : isPastDate || !isCurrentMonth
-                                    ? AppColors.textSecondary.withValues(alpha: 0.5)
+                                    ? AppColors.textSecondary
+                                        .withValues(alpha: 0.5)
                                     : AppColors.textPrimary,
-                            fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                            fontWeight: isSelected
+                                ? FontWeight.w600
+                                : FontWeight.normal,
                           ),
                         ),
                       ),
@@ -304,38 +311,40 @@ class _BookingScreenState extends State<BookingScreen> {
 
   Widget _buildTimeSlots() {
     return Column(
-      children: timeSlots.map((time) => Container(
-        margin: const EdgeInsets.only(bottom: 8),
-        child: ListTile(
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8),
-            side: BorderSide(color: AppColors.divider),
-          ),
-          tileColor: AppColors.white,
-          title: Text(
-            time,
-            style: AppTypography.bodyMedium.copyWith(
-              color: AppColors.textPrimary,
-            ),
-          ),
-          trailing: Radio<String>(
-            value: time,
-            groupValue: selectedTime,
-            onChanged: (value) {
-              setState(() {
-                selectedTime = value!;
-              });
-            },
-            activeColor: AppColors.forestGreen,
-          ),
-          onTap: () {
-            setState(() {
-              selectedTime = time;
-            });
-          },
-        ),
-      )).toList(),
+      children: timeSlots
+          .map((time) => Container(
+                margin: const EdgeInsets.only(bottom: 8),
+                child: ListTile(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    side: BorderSide(color: AppColors.divider),
+                  ),
+                  tileColor: AppColors.white,
+                  title: Text(
+                    time,
+                    style: AppTypography.bodyMedium.copyWith(
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  trailing: Radio<String>(
+                    value: time,
+                    groupValue: selectedTime,
+                    onChanged: (value) {
+                      setState(() {
+                        selectedTime = value!;
+                      });
+                    },
+                    activeColor: AppColors.forestGreen,
+                  ),
+                  onTap: () {
+                    setState(() {
+                      selectedTime = time;
+                    });
+                  },
+                ),
+              ))
+          .toList(),
     );
   }
 
@@ -401,13 +410,33 @@ class _BookingScreenState extends State<BookingScreen> {
       ),
       child: Column(
         children: [
-          _buildSummaryRow('Date', selectedDate != null
-              ? '${selectedDate!.year}-${selectedDate!.month.toString().padLeft(2, '0')}-${selectedDate!.day.toString().padLeft(2, '0')}'
-              : 'Not selected'),
+          _buildSummaryRow(
+              'Date',
+              selectedDate != null
+                  ? '${selectedDate!.year}-${selectedDate!.month.toString().padLeft(2, '0')}-${selectedDate!.day.toString().padLeft(2, '0')}'
+                  : 'Not selected'),
           _buildSummaryRow('Time', selectedTime),
           _buildSummaryRow('Guests', guests.toString()),
           const Divider(),
-          _buildSummaryRow('Total', '\$${total.toStringAsFixed(2)} COP', isTotal: true),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Total',
+                style: AppTypography.bodyMedium.copyWith(
+                  color: AppColors.textPrimary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              CurrencyPrice(
+                priceInCOP: total,
+                style: AppTypography.bodyMedium.copyWith(
+                  color: AppColors.textPrimary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
         ],
       ),
     );
@@ -456,15 +485,18 @@ class _BookingScreenState extends State<BookingScreen> {
         child: SizedBox(
           width: double.infinity,
           child: ElevatedButton(
-            onPressed: selectedDate != null ? () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Booking confirmed for ${_formatSelectedDate()}!'),
-                  backgroundColor: AppColors.forestGreen,
-                ),
-              );
-              context.pop();
-            } : null,
+            onPressed: selectedDate != null
+                ? () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                            'Booking confirmed for ${_formatSelectedDate()}!'),
+                        backgroundColor: AppColors.forestGreen,
+                      ),
+                    );
+                    context.pop();
+                  }
+                : null,
             style: ElevatedButton.styleFrom(
               padding: const EdgeInsets.symmetric(vertical: 16),
               backgroundColor: AppColors.forestGreen,
@@ -483,28 +515,40 @@ class _BookingScreenState extends State<BookingScreen> {
 
   String _getMonthYearText() {
     const months = [
-      'January', 'February', 'March', 'April', 'May', 'June',
-      'July', 'August', 'September', 'October', 'November', 'December'
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December'
     ];
     return '${months[currentMonth.month - 1]} ${currentMonth.year}';
   }
 
   int _getDaysInMonth() {
     final firstDayOfMonth = DateTime(currentMonth.year, currentMonth.month, 1);
-    final lastDayOfMonth = DateTime(currentMonth.year, currentMonth.month + 1, 0);
+    final lastDayOfMonth =
+        DateTime(currentMonth.year, currentMonth.month + 1, 0);
     final firstWeekday = firstDayOfMonth.weekday % 7; // Sunday = 0
-    
+
     return firstWeekday + lastDayOfMonth.day;
   }
 
   Map<String, dynamic>? _getDayData(int index) {
     final firstDayOfMonth = DateTime(currentMonth.year, currentMonth.month, 1);
     final firstWeekday = firstDayOfMonth.weekday % 7; // Sunday = 0
-    
+
     if (index < firstWeekday) {
       // Previous month days
       final prevMonth = DateTime(currentMonth.year, currentMonth.month - 1);
-      final prevMonthLastDay = DateTime(currentMonth.year, currentMonth.month, 0).day;
+      final prevMonthLastDay =
+          DateTime(currentMonth.year, currentMonth.month, 0).day;
       final day = prevMonthLastDay - (firstWeekday - index - 1);
       return {
         'date': DateTime(prevMonth.year, prevMonth.month, day),
@@ -512,10 +556,11 @@ class _BookingScreenState extends State<BookingScreen> {
         'isCurrentMonth': false,
       };
     }
-    
+
     final dayInMonth = index - firstWeekday + 1;
-    final lastDayOfMonth = DateTime(currentMonth.year, currentMonth.month + 1, 0).day;
-    
+    final lastDayOfMonth =
+        DateTime(currentMonth.year, currentMonth.month + 1, 0).day;
+
     if (dayInMonth <= lastDayOfMonth) {
       // Current month days
       return {
@@ -524,7 +569,7 @@ class _BookingScreenState extends State<BookingScreen> {
         'isCurrentMonth': true,
       };
     }
-    
+
     // Next month days
     final nextMonthDay = dayInMonth - lastDayOfMonth;
     final nextMonth = DateTime(currentMonth.year, currentMonth.month + 1);
@@ -538,8 +583,18 @@ class _BookingScreenState extends State<BookingScreen> {
   String _formatSelectedDate() {
     if (selectedDate == null) return '';
     const months = [
-      'January', 'February', 'March', 'April', 'May', 'June',
-      'July', 'August', 'September', 'October', 'November', 'December'
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December'
     ];
     return '${months[selectedDate!.month - 1]} ${selectedDate!.day}, ${selectedDate!.year}';
   }

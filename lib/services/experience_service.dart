@@ -18,30 +18,75 @@ class ExperienceService {
   ///
   /// This strategy ensures the app works offline and minimizes battery drain
   /// by NOT polling Firebase periodically.
+  ///
+  /// When forceRefresh = true, fetches fresh data from server and updates all caches.
   Future<List<models.Experience>> getExperiences(
       {bool forceRefresh = false}) async {
     List<models.Experience> experiences = [];
 
-    // STEP 1: Try Firebase Cache first (fastest, in-memory)
-    if (!forceRefresh) {
+    // If forceRefresh is true, skip cache/local and fetch directly from server
+    // This mimics what happens when changing screens but forces a server fetch
+    if (forceRefresh) {
+      print('� Force refresh: Fetching directly from Firebase server...');
+
+      // Skip STEP 1 (Firebase Cache) and STEP 2 (Local DB)
+      // Go directly to STEP 3 (Firebase Server)
       try {
-        final cacheSnapshot = await _firestore
+        print('📡 Fetching from Firebase server (bypass cache)...');
+        final serverSnapshot = await _firestore
             .collection('experiences')
-            .get(const GetOptions(source: Source.cache));
-        if (cacheSnapshot.docs.isNotEmpty) {
-          experiences = cacheSnapshot.docs
+            .get(const GetOptions(source: Source.server));
+
+        if (serverSnapshot.docs.isNotEmpty) {
+          experiences = serverSnapshot.docs
               .map((doc) => models.Experience.fromFirestore(doc))
               .toList();
-          print(
-              '✓ Loaded ${experiences.length} experiences from Firebase cache');
+          print('✅ Loaded ${experiences.length} fresh experiences from server');
 
-          // Cache hit - also ensure local DB is synced in background
-          _syncCacheToLocalDB(experiences);
-          return experiences;
+          // Update local database with fresh server data (don't clear, just update)
+          await _syncServerToLocalDB(experiences);
+          print('✅ Synced ${experiences.length} experiences to local database');
+        } else {
+          print('⚠️ No experiences found on server');
         }
+        return experiences;
       } catch (e) {
-        print('Firebase cache miss or error: $e');
+        print('❌ Firebase server error during force refresh: $e');
+        // Fall back to local database if server fails
+        try {
+          final localExperiences = await _database.getAllExperiences();
+          if (localExperiences.isNotEmpty) {
+            experiences = localExperiences
+                .map((e) => DatabaseConverters.experienceFromDrift(e))
+                .toList();
+            print(
+                '✓ Loaded ${experiences.length} experiences from local database (fallback)');
+          }
+        } catch (localError) {
+          print('❌ Local database error: $localError');
+        }
+        return experiences;
       }
+    }
+
+    // STEP 1: Try Firebase Cache first (fastest, in-memory)
+    try {
+      final cacheSnapshot = await _firestore
+          .collection('experiences')
+          .get(const GetOptions(source: Source.cache));
+      if (cacheSnapshot.docs.isNotEmpty) {
+        experiences = cacheSnapshot.docs
+            .map((doc) => models.Experience.fromFirestore(doc))
+            .toList();
+        print('✓ Loaded ${experiences.length} experiences from Firebase cache');
+
+        // Cache hit - also ensure local DB is synced in background
+        _syncCacheToLocalDB(experiences);
+
+        return experiences;
+      }
+    } catch (e) {
+      print('Firebase cache miss or error: $e');
     }
 
     // STEP 2: Try Local SQLite Database (offline persistence)
@@ -54,14 +99,10 @@ class ExperienceService {
         print('✓ Loaded ${experiences.length} experiences from local database');
 
         // We have local data - try to refresh from server in background
-        if (!forceRefresh) {
-          _refreshFromServerInBackground();
-        }
+        _refreshFromServerInBackground();
 
         // Return local data immediately
-        if (!forceRefresh && experiences.isNotEmpty) {
-          return experiences;
-        }
+        return experiences;
       }
     } catch (e) {
       print('Local database error: $e');
@@ -134,32 +175,98 @@ class ExperienceService {
   }
 
   /// Get experiences by host ID with offline-first strategy
+  /// When forceRefresh = true, fetches fresh data directly from server.
   Future<List<models.Experience>> getExperiencesByHost(String hostId,
       {bool forceRefresh = false}) async {
     List<models.Experience> experiences = [];
 
-    // STEP 1: Try Firebase Cache first (fastest, in-memory)
-    if (!forceRefresh) {
+    // If forceRefresh is true, fetch fresh from server
+    if (forceRefresh) {
       try {
-        final cacheSnapshot = await _firestore
+        print(
+            '🔄 Force refresh: fetching host $hostId experiences from Firebase server...');
+
+        // Fetch directly from server (bypassing Firestore cache)
+        final serverSnapshot = await _firestore
             .collection('experiences')
             .where('hostId',
                 isEqualTo: _firestore.collection('users').doc(hostId))
-            .get(const GetOptions(source: Source.cache));
-        if (cacheSnapshot.docs.isNotEmpty) {
-          experiences = cacheSnapshot.docs
+            .get(const GetOptions(source: Source.server));
+        if (serverSnapshot.docs.isNotEmpty) {
+          experiences = serverSnapshot.docs
               .map((doc) => models.Experience.fromFirestore(doc))
               .toList();
           print(
-              '✓ Loaded ${experiences.length} experiences for host $hostId from Firebase cache');
+              '✓ Loaded ${experiences.length} fresh experiences for host $hostId from Firebase server');
 
-          // Cache hit - also ensure local DB is synced in background
-          _syncCacheToLocalDB(experiences);
-          return experiences;
+          // Update local database with fresh server data
+          await _syncServerToLocalDB(experiences);
+          print('✓ Updated local database with host experiences');
+        } else {
+          print('⚠️ No experiences found for host $hostId on server');
         }
+        return experiences;
       } catch (e) {
-        print('Firebase cache miss or error for host $hostId: $e');
+        print(
+            '❌ Firebase server error during force refresh for host $hostId: $e');
+        // If server fails during force refresh, fall back to local/cache data
+        try {
+          // Try Firebase cache first
+          final cacheSnapshot = await _firestore
+              .collection('experiences')
+              .where('hostId',
+                  isEqualTo: _firestore.collection('users').doc(hostId))
+              .get(const GetOptions(source: Source.cache));
+          if (cacheSnapshot.docs.isNotEmpty) {
+            experiences = cacheSnapshot.docs
+                .map((doc) => models.Experience.fromFirestore(doc))
+                .toList();
+            print(
+                '✓ Loaded ${experiences.length} experiences for host $hostId from cache (fallback)');
+            return experiences;
+          }
+
+          // Fall back to local database
+          final allLocalExperiences = await _database.getAllExperiences();
+          if (allLocalExperiences.isNotEmpty) {
+            final hostExperiences = allLocalExperiences
+                .where((exp) => exp.hostId == hostId)
+                .map((e) => DatabaseConverters.experienceFromDrift(e))
+                .toList();
+
+            if (hostExperiences.isNotEmpty) {
+              experiences = hostExperiences;
+              print(
+                  '✓ Loaded ${experiences.length} experiences for host $hostId from local database (fallback)');
+            }
+          }
+        } catch (fallbackError) {
+          print('❌ Fallback also failed for host $hostId: $fallbackError');
+        }
+        return experiences;
       }
+    }
+
+    // STEP 1: Try Firebase Cache first (fastest, in-memory)
+    try {
+      final cacheSnapshot = await _firestore
+          .collection('experiences')
+          .where('hostId',
+              isEqualTo: _firestore.collection('users').doc(hostId))
+          .get(const GetOptions(source: Source.cache));
+      if (cacheSnapshot.docs.isNotEmpty) {
+        experiences = cacheSnapshot.docs
+            .map((doc) => models.Experience.fromFirestore(doc))
+            .toList();
+        print(
+            '✓ Loaded ${experiences.length} experiences for host $hostId from Firebase cache');
+
+        // Cache hit - also ensure local DB is synced in background
+        _syncCacheToLocalDB(experiences);
+        return experiences;
+      }
+    } catch (e) {
+      print('Firebase cache miss or error for host $hostId: $e');
     }
 
     // STEP 2: Try Local SQLite Database (offline persistence)
@@ -171,21 +278,17 @@ class ExperienceService {
             .where((exp) => exp.hostId == hostId)
             .map((e) => DatabaseConverters.experienceFromDrift(e))
             .toList();
-        
+
         if (hostExperiences.isNotEmpty) {
           experiences = hostExperiences;
           print(
               '✓ Loaded ${experiences.length} experiences for host $hostId from local database');
 
           // We have local data - try to refresh from server in background
-          if (!forceRefresh) {
-            _refreshHostExperiencesInBackground(hostId);
-          }
+          _refreshHostExperiencesInBackground(hostId);
 
           // Return local data immediately
-          if (!forceRefresh && experiences.isNotEmpty) {
-            return experiences;
-          }
+          return experiences;
         }
       }
     } catch (e) {
@@ -196,7 +299,8 @@ class ExperienceService {
     try {
       final serverSnapshot = await _firestore
           .collection('experiences')
-          .where('hostId', isEqualTo: _firestore.collection('users').doc(hostId))
+          .where('hostId',
+              isEqualTo: _firestore.collection('users').doc(hostId))
           .get();
       if (serverSnapshot.docs.isNotEmpty) {
         experiences = serverSnapshot.docs

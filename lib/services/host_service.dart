@@ -10,8 +10,34 @@ class HostService {
   final AppDatabase _database = AppDatabase();
 
   /// Get host/user by ID with offline-first strategy
-  Future<Host?> getHostById(String id) async {
+  /// When forceRefresh = true, fetches directly from server bypassing cache.
+  Future<Host?> getHostById(String id, {bool forceRefresh = false}) async {
     Host? host;
+
+    // If forceRefresh is true, go directly to server
+    if (forceRefresh) {
+      try {
+        print('🔄 Force refresh: fetching host $id from Firebase server...');
+        DocumentSnapshot doc = await _firestore
+            .collection('users')
+            .doc(id)
+            .get(const GetOptions(source: Source.server));
+        if (doc.exists) {
+          host = Host.fromFirestore(doc);
+          print('✓ Got host $id from Firebase server (force refresh)');
+
+          // Update local database
+          await _database.upsertUser(
+            DatabaseConverters.hostToCompanion(host),
+          );
+
+          return host;
+        }
+      } catch (e) {
+        print('Error getting host $id from server: $e');
+        // Fall back to cache/local on error
+      }
+    }
 
     // STEP 1: Try Firebase cache
     try {

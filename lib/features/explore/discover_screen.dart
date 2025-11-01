@@ -42,6 +42,9 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
 
   @override
   Widget build(BuildContext context) {
+    debugPrint(
+        '🏗️ DiscoverScreen build called - experiences: ${_viewModel.filteredExperiences.length}, isLoading: ${_viewModel.isLoading}, isRefreshing: ${_viewModel.isRefreshing}');
+
     return Scaffold(
       resizeToAvoidBottomInset: true,
       appBar: AppBar(
@@ -192,16 +195,22 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   }
 
   Widget _buildExperienceList() {
+    debugPrint(
+        '🏗️ Building experience list with ${_viewModel.filteredExperiences.length} items');
+
     if (_viewModel.filteredExperiences.isEmpty) {
       return _buildEmptyState();
     }
 
     return RefreshIndicator(
       onRefresh: () async {
+        debugPrint('👆 User pulled down to refresh');
         await _viewModel.fetchExperiences(forceRefresh: true);
+        debugPrint('✅ Refresh completed');
       },
       color: AppColors.forestGreen,
       child: ListView.builder(
+        key: ObjectKey(_viewModel.filteredExperiences),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         physics: const AlwaysScrollableScrollPhysics(),
         itemCount: _viewModel.filteredExperiences.length,
@@ -210,6 +219,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
           return Padding(
             padding: const EdgeInsets.only(bottom: 16),
             child: ExperienceCard(
+              key: ValueKey('exp_${experience.id}'),
               experience: experience,
               onTap: () => _navigateToExperience(experience.id),
             ),
@@ -234,7 +244,9 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
 
     return RefreshIndicator(
       onRefresh: () async {
+        debugPrint('👆 User pulled down to refresh (empty state)');
         await _viewModel.fetchExperiences(forceRefresh: true);
+        debugPrint('✅ Refresh completed (empty state)');
       },
       color: AppColors.forestGreen,
       child: SingleChildScrollView(
@@ -353,6 +365,26 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   }
 
   void _navigateToChatbot() {
+    // Check if online before navigating to chatbot
+    if (!_viewModel.isOnline) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Row(
+            children: [
+              Icon(Icons.cloud_off, color: Colors.white),
+              SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                    'No internet connection. The Travel Agent requires internet access.'),
+              ),
+            ],
+          ),
+          backgroundColor: Colors.red,
+          duration: Duration(seconds: 3),
+        ),
+      );
+      return;
+    }
     context.push('/chatbot');
   }
 

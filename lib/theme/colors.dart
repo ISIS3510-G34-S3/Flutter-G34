@@ -13,6 +13,7 @@ class AppColors {
 
   // Neutrals
   static const Color background = Color(0xFFFAFAFA);
+  static const Color backgroundSecondary = Color(0xFFF5F5F5);
   static const Color textPrimary = Color(0xFF2A2A2A);
   static const Color textSecondary = Color(0xFF757575);
   static const Color white = Color(0xFFFFFFFF);
