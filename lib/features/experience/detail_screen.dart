@@ -9,7 +9,10 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../../theme/colors.dart';
 import '../../theme/typography.dart';
 
-/// Experience detail screen showing full information about an experience
+import '../experience/booking_screen.dart';
+import '../../widgets/currency_price.dart';
+
+/// Experience detail screen with comprehensive information
 class ExperienceDetailScreen extends StatefulWidget {
   const ExperienceDetailScreen({
     super.key,
@@ -265,8 +268,8 @@ class _ExperienceDetailScreenState extends State<ExperienceDetailScreen> {
                 ),
               ),
               const Spacer(),
-              Text(
-                '${_formatPrice(experience.priceCOP)} COP',
+              CurrencyPrice(
+                priceInCOP: experience.priceCOP,
                 style: AppTypography.titleSmall.copyWith(
                   color: AppColors.forestGreen,
                   fontWeight: FontWeight.bold,
@@ -610,11 +613,13 @@ class _ExperienceDetailScreenState extends State<ExperienceDetailScreen> {
             runSpacing: 8,
             children: experience.languages.map((language) {
               return Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 decoration: BoxDecoration(
                   color: AppColors.forestGreen.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: AppColors.forestGreen.withOpacity(0.3)),
+                  border:
+                      Border.all(color: AppColors.forestGreen.withOpacity(0.3)),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,

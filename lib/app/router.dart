@@ -11,6 +11,7 @@ import '../features/create/create_experience_screen.dart';
 import '../features/profile/profile_screen.dart';
 import '../features/profile/profie_verification_screen.dart';
 import '../features/profile/local_media_screen.dart';
+import '../features/profile/currency_settings_screen.dart';
 import '../features/messaging/messaging_screen.dart';
 import '../features/chatbot/chatbot_screen.dart';
 import '../widgets/main_scaffold.dart';
@@ -177,6 +178,13 @@ final GoRouter appRouter = GoRouter(
       path: '/local-media',
       name: 'local-media',
       builder: (context, state) => const LocalMediaScreen(),
+    ),
+
+    // Currency settings route (standalone)
+    GoRoute(
+      path: '/currency-settings',
+      name: 'currency-settings',
+      builder: (context, state) => const CurrencySettingsScreen(),
     ),
   ],
   errorBuilder: (context, state) => Scaffold(

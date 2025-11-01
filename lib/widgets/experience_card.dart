@@ -3,6 +3,7 @@ import 'package:travel_connect/models/experience.dart';
 import '../theme/colors.dart';
 import '../theme/typography.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'currency_price.dart';
 
 /// Experience card widget for displaying experience information in lists
 class ExperienceCard extends StatelessWidget {
@@ -48,11 +49,12 @@ class ExperienceCard extends StatelessWidget {
                   const SizedBox(height: 12),
 
                   // Price
-                  Text(
-                    '\$${experience.priceCOP} COP',
+                  CurrencyPrice(
+                    priceInCOP: experience.priceCOP,
                     style: AppTypography.titleMedium.copyWith(
                       color: AppColors.forestGreen,
                     ),
+                    compact: true,
                   ),
                 ],
               ),
