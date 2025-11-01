@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import '../../theme/colors.dart';
 import '../../theme/typography.dart';
 import '../../mock/mock_data.dart';
+import '../../services/image_processing_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:convert';
@@ -970,17 +971,25 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
       final String extension = 'jpg';
       final String fileName = 'photo_$timestamp.$extension';
 
+      // ✅ Compress image in separate isolate (multi-threading)
+      final compressedBytes = await ImageProcessingService.compressImage(
+        imagePath: mediaFile.path,
+        maxWidth: 1920,
+        quality: 85,
+      );
+
       // Copy to local storage
       final localPath = '${picturesDir.path}/$fileName';
-      final File localFile = await File(mediaFile.path).copy(localPath);
+      final File localFile = File(localPath);
+      await localFile.writeAsBytes(compressedBytes);
 
       // Upload to Firebase Storage
       final storage = FirebaseStorage.instanceFor(
         bucket: 'gs://travelappbd-8e204.firebasestorage.app',
       );
       final ref = storage.ref().child('experiences/$uid/$fileName');
-      final uploadTask = await ref.putFile(
-        localFile,
+      final uploadTask = await ref.putData(
+        compressedBytes,
         SettableMetadata(contentType: isVideo ? 'video/mp4' : 'image/jpeg'),
       );
       final String downloadUrl = await uploadTask.ref.getDownloadURL();

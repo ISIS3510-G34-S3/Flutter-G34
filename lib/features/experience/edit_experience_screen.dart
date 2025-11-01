@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import '../../mock/mock_data.dart' as mock;
+import '../../services/image_processing_service.dart';
 import 'package:travel_connect/models/experience.dart';
 import 'package:travel_connect/services/experience_service.dart';
 import 'package:travel_connect/theme/colors.dart';
@@ -255,17 +256,25 @@ class _EditExperienceScreenState extends State<EditExperienceScreen> {
       final String extension = 'jpg';
       final String fileName = 'photo_$timestamp.$extension';
 
+      // ✅ Compress image in separate isolate (multi-threading)
+      final compressedBytes = await ImageProcessingService.compressImage(
+        imagePath: mediaFile.path,
+        maxWidth: 1920,
+        quality: 85,
+      );
+
       // Copy to local storage
       final localPath = '${picturesDir.path}/$fileName';
-      final File localFile = await File(mediaFile.path).copy(localPath);
+      final File localFile = File(localPath);
+      await localFile.writeAsBytes(compressedBytes);
 
       // Upload to Firebase Storage using current user's UID
       final storage = FirebaseStorage.instanceFor(
         bucket: 'gs://travelappbd-8e204.firebasestorage.app',
       );
       final ref = storage.ref().child('experiences/$uid/$fileName');
-      final uploadTask = await ref.putFile(
-        localFile,
+      final uploadTask = await ref.putData(
+        compressedBytes,
         SettableMetadata(contentType: 'image/jpeg'),
       );
       final String downloadUrl = await uploadTask.ref.getDownloadURL();
