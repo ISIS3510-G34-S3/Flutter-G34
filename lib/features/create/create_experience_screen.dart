@@ -5,6 +5,7 @@ import '../../theme/typography.dart';
 import '../../mock/mock_data.dart';
 import '../../services/image_processing_service.dart';
 import '../../services/experience_service.dart';
+import '../../services/host_preferences_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:convert';
@@ -28,6 +29,7 @@ class CreateExperienceScreen extends StatefulWidget {
 class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
   final _formKey = GlobalKey<FormState>();
   final ExperienceService _experienceService = ExperienceService();
+  final HostPreferencesService _hostPrefs = HostPreferencesService();
   final _titleController = TextEditingController();
   final _descriptionController = TextEditingController();
   final _durationController = TextEditingController();
@@ -76,6 +78,7 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
     super.initState();
     // Start monitoring connectivity for auto-sync
     _experienceService.startConnectivityMonitoring();
+    _loadPreferredLanguages();
     _checkInitialConnectivity();
     _listenToConnectivity();
   }
@@ -113,6 +116,16 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
     _skillsToLearnController.dispose();
     _placesDebounce?.cancel();
     super.dispose();
+  }
+
+  Future<void> _loadPreferredLanguages() async {
+    final saved = await _hostPrefs.loadLanguages();
+    if (!mounted) return;
+    if (saved.isNotEmpty && _selectedLanguages.isEmpty) {
+      setState(() {
+        _selectedLanguages = List<String>.from(saved);
+      });
+    }
   }
 
   Widget _buildDurationField() {
@@ -1202,6 +1215,8 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
       final experienceId =
           await _experienceService.createExperienceOfflineCapable(
               experience, localImagePaths);
+
+      await _hostPrefs.saveLanguages(_selectedLanguages);
 
       if (!mounted) return;
 
