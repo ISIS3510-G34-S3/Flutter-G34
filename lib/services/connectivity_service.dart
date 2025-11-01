@@ -39,7 +39,8 @@ class ConnectivityService {
         _isOnline = !results.contains(ConnectivityResult.none);
 
         if (wasOnline != _isOnline) {
-          debugPrint('📡 Connectivity changed: ${_isOnline ? "Online" : "Offline"}');
+          debugPrint(
+              '📡 Connectivity changed: ${_isOnline ? "Online" : "Offline"}');
           onConnectivityChanged(_isOnline);
         }
       },

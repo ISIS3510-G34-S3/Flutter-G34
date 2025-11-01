@@ -74,7 +74,8 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
               Icon(Icons.cloud_off, color: Colors.white),
               SizedBox(width: 12),
               Expanded(
-                child: Text('No internet connection. Please check your network and try again.'),
+                child: Text(
+                    'No internet connection. Please check your network and try again.'),
               ),
             ],
           ),
@@ -308,7 +309,8 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
                     backgroundColor: Theme.of(context).primaryColor,
                     child: IconButton(
                       icon: const Icon(Icons.send, color: Colors.white),
-                      onPressed: (_isLoading || !_isOnline) ? null : _sendMessage,
+                      onPressed:
+                          (_isLoading || !_isOnline) ? null : _sendMessage,
                     ),
                   ),
                 ],

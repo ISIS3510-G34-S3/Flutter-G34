@@ -374,7 +374,8 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
               Icon(Icons.cloud_off, color: Colors.white),
               SizedBox(width: 12),
               Expanded(
-                child: Text('No internet connection. The Travel Agent requires internet access.'),
+                child: Text(
+                    'No internet connection. The Travel Agent requires internet access.'),
               ),
             ],
           ),

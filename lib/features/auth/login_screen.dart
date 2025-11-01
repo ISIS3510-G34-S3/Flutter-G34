@@ -348,7 +348,8 @@ class _LoginScreenState extends State<LoginScreen> {
               Icon(Icons.cloud_off, color: Colors.white),
               SizedBox(width: 12),
               Expanded(
-                child: Text('No internet connection. Please check your network and try again.'),
+                child: Text(
+                    'No internet connection. Please check your network and try again.'),
               ),
             ],
           ),
@@ -427,7 +428,8 @@ class _LoginScreenState extends State<LoginScreen> {
               Icon(Icons.cloud_off, color: Colors.white),
               SizedBox(width: 12),
               Expanded(
-                child: Text('No internet connection. Please check your network and try again.'),
+                child: Text(
+                    'No internet connection. Please check your network and try again.'),
               ),
             ],
           ),
