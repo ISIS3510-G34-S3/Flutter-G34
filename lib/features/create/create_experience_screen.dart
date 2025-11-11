@@ -6,6 +6,7 @@ import '../../mock/mock_data.dart';
 import '../../services/image_processing_service.dart';
 import '../../services/experience_service.dart';
 import '../../services/host_preferences_service.dart';
+import '../../widgets/syncing_toast.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:convert';
@@ -49,6 +50,7 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
   String? _selectedLocationLabel;
   String? _selectedDepartment;
   bool _isLoading = false;
+  bool _isUploadingMedia = false;
   String? _manualLocation;
   bool _hasConnectivity = true;
 
@@ -235,199 +237,210 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          'Create Experience',
-          style: AppTypography.titleMedium.copyWith(
-            color: AppColors.white,
-          ),
-        ),
-        backgroundColor: AppColors.forestGreen,
-        elevation: 0,
-        automaticallyImplyLeading: false,
-        actions: [
-          TextButton(
-            onPressed: _isLoading ? null : _saveExperience,
-            child: Text(
-              'Save',
-              style: AppTypography.buttonMedium.copyWith(
-                color: AppColors.white,
+    return ValueListenableBuilder<bool>(
+      valueListenable: ExperienceService.syncingNotifier,
+      builder: (context, isSyncing, _) {
+        return Stack(
+          children: [
+            Scaffold(
+              appBar: AppBar(
+                title: Text(
+                  'Create Experience',
+                  style: AppTypography.titleMedium.copyWith(
+                    color: AppColors.white,
+                  ),
+                ),
+                backgroundColor: AppColors.forestGreen,
+                elevation: 0,
+                automaticallyImplyLeading: false,
+                actions: [
+                  TextButton(
+                    onPressed: _isLoading ? null : _saveExperience,
+                    child: Text(
+                      'Save',
+                      style: AppTypography.buttonMedium.copyWith(
+                        color: AppColors.white,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              body: Form(
+                key: _formKey,
+                child: ListView(
+                  padding: const EdgeInsets.all(16),
+                  children: [
+                    // Photo upload section
+                    _buildPhotoSection(),
+
+                    const SizedBox(height: 24),
+
+                    // Experience title
+                    _buildTextField(
+                      label: 'Experience Title',
+                      controller: _titleController,
+                      hint: 'e.g. Learn Coffee Harvesting & Teach Photography',
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Please enter a title';
+                        }
+                        return null;
+                      },
+                    ),
+
+                    const SizedBox(height: 20),
+
+                    // Description
+                    _buildTextField(
+                      label: 'Description',
+                      controller: _descriptionController,
+                      hint:
+                          'Describe the experience and what guests will learn and teach...',
+                      maxLines: 4,
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Please enter a description';
+                        }
+                        return null;
+                      },
+                    ),
+
+                    const SizedBox(height: 20),
+
+                    // Category dropdown
+                    _buildCategoryMultiSelect(),
+
+                    const SizedBox(height: 20),
+
+                    // Duration (hours, non-negative)
+                    _buildDurationField(),
+
+                    const SizedBox(height: 20),
+
+                    // Department is auto-filled from location
+
+                    // Price (COP, non-negative)
+                    _buildNumericField(
+                      label: 'Price (COP)',
+                      controller: _priceController,
+                      hint: 'e.g. 120000',
+                      allowNegative: false,
+                      validatorMessage: 'Please enter a valid non-negative price',
+                    ),
+
+                    const SizedBox(height: 20),
+
+                    // Group size (non-negative)
+                    _buildNumericField(
+                      label: 'Max Group Size',
+                      controller: _groupSizeController,
+                      hint: 'e.g. 8',
+                      allowNegative: false,
+                      validatorMessage:
+                          'Please enter a valid non-negative group size',
+                    ),
+
+                    const SizedBox(height: 20),
+
+                    // Location picker with Google Places search
+                    _buildLocationPicker(),
+
+                    const SizedBox(height: 20),
+
+                    // Skills you will teach
+                    _buildTextField(
+                      label: 'Skills You Will Teach',
+                      controller: _skillsToTeachController,
+                      hint:
+                          'What skills or knowledge will you share with participants?',
+                      maxLines: 3,
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Please enter skills you will teach';
+                        }
+                        return null;
+                      },
+                    ),
+
+                    const SizedBox(height: 20),
+
+                    // Skills you want to learn
+                    _buildTextField(
+                      label: 'Skills You Want to Learn',
+                      controller: _skillsToLearnController,
+                      hint: 'What would you like to learn from participants?',
+                      maxLines: 3,
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Please enter skills you want to learn';
+                        }
+                        return null;
+                      },
+                    ),
+
+                    const SizedBox(height: 20),
+
+                    // Languages
+                    _buildChipsSection(
+                      label: 'Languages',
+                      options: _languageOptions,
+                      selected: _selectedLanguages,
+                      onToggle: (value) {
+                        setState(() {
+                          if (_selectedLanguages.contains(value)) {
+                            _selectedLanguages.remove(value);
+                          } else {
+                            _selectedLanguages.add(value);
+                          }
+                        });
+                      },
+                    ),
+
+                    const SizedBox(height: 20),
+
+                    // Payment Options
+                    _buildChipsSection(
+                      label: 'Payment Options',
+                      options: _paymentOptions,
+                      selected: _selectedPaymentOptions,
+                      onToggle: (value) {
+                        setState(() {
+                          if (_selectedPaymentOptions.contains(value)) {
+                            _selectedPaymentOptions.remove(value);
+                          } else {
+                            _selectedPaymentOptions.add(value);
+                          }
+                        });
+                      },
+                    ),
+
+                    const SizedBox(height: 20),
+
+                    // Accessibility Features
+                    _buildChipsSection(
+                      label: 'Accessibility Features',
+                      options: _accessibilityOptions,
+                      selected: _selectedAccessibilityFeatures,
+                      onToggle: (value) {
+                        setState(() {
+                          if (_selectedAccessibilityFeatures.contains(value)) {
+                            _selectedAccessibilityFeatures.remove(value);
+                          } else {
+                            _selectedAccessibilityFeatures.add(value);
+                          }
+                        });
+                      },
+                    ),
+
+                    const SizedBox(height: 32),
+                  ],
+                ),
               ),
             ),
-          ),
-        ],
-      ),
-      body: Form(
-        key: _formKey,
-        child: ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            // Photo upload section
-            _buildPhotoSection(),
-
-            const SizedBox(height: 24),
-
-            // Experience title
-            _buildTextField(
-              label: 'Experience Title',
-              controller: _titleController,
-              hint: 'e.g. Learn Coffee Harvesting & Teach Photography',
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'Please enter a title';
-                }
-                return null;
-              },
-            ),
-
-            const SizedBox(height: 20),
-
-            // Description
-            _buildTextField(
-              label: 'Description',
-              controller: _descriptionController,
-              hint:
-                  'Describe the experience and what guests will learn and teach...',
-              maxLines: 4,
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'Please enter a description';
-                }
-                return null;
-              },
-            ),
-
-            const SizedBox(height: 20),
-
-            // Category dropdown
-            _buildCategoryMultiSelect(),
-
-            const SizedBox(height: 20),
-
-            // Duration (hours, non-negative)
-            _buildDurationField(),
-
-            const SizedBox(height: 20),
-
-            // Department is auto-filled from location
-
-            // Price (COP, non-negative)
-            _buildNumericField(
-              label: 'Price (COP)',
-              controller: _priceController,
-              hint: 'e.g. 120000',
-              allowNegative: false,
-              validatorMessage: 'Please enter a valid non-negative price',
-            ),
-
-            const SizedBox(height: 20),
-
-            // Group size (non-negative)
-            _buildNumericField(
-              label: 'Max Group Size',
-              controller: _groupSizeController,
-              hint: 'e.g. 8',
-              allowNegative: false,
-              validatorMessage: 'Please enter a valid non-negative group size',
-            ),
-
-            const SizedBox(height: 20),
-
-            // Location picker with Google Places search
-            _buildLocationPicker(),
-
-            const SizedBox(height: 20),
-
-            // Skills you will teach
-            _buildTextField(
-              label: 'Skills You Will Teach',
-              controller: _skillsToTeachController,
-              hint:
-                  'What skills or knowledge will you share with participants?',
-              maxLines: 3,
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'Please enter skills you will teach';
-                }
-                return null;
-              },
-            ),
-
-            const SizedBox(height: 20),
-
-            // Skills you want to learn
-            _buildTextField(
-              label: 'Skills You Want to Learn',
-              controller: _skillsToLearnController,
-              hint: 'What would you like to learn from participants?',
-              maxLines: 3,
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'Please enter skills you want to learn';
-                }
-                return null;
-              },
-            ),
-
-            const SizedBox(height: 20),
-
-            // Languages
-            _buildChipsSection(
-              label: 'Languages',
-              options: _languageOptions,
-              selected: _selectedLanguages,
-              onToggle: (value) {
-                setState(() {
-                  if (_selectedLanguages.contains(value)) {
-                    _selectedLanguages.remove(value);
-                  } else {
-                    _selectedLanguages.add(value);
-                  }
-                });
-              },
-            ),
-
-            const SizedBox(height: 20),
-
-            // Payment Options
-            _buildChipsSection(
-              label: 'Payment Options',
-              options: _paymentOptions,
-              selected: _selectedPaymentOptions,
-              onToggle: (value) {
-                setState(() {
-                  if (_selectedPaymentOptions.contains(value)) {
-                    _selectedPaymentOptions.remove(value);
-                  } else {
-                    _selectedPaymentOptions.add(value);
-                  }
-                });
-              },
-            ),
-
-            const SizedBox(height: 20),
-
-            // Accessibility Features
-            _buildChipsSection(
-              label: 'Accessibility Features',
-              options: _accessibilityOptions,
-              selected: _selectedAccessibilityFeatures,
-              onToggle: (value) {
-                setState(() {
-                  if (_selectedAccessibilityFeatures.contains(value)) {
-                    _selectedAccessibilityFeatures.remove(value);
-                  } else {
-                    _selectedAccessibilityFeatures.add(value);
-                  }
-                });
-              },
-            ),
-
-            const SizedBox(height: 32),
+            if (isSyncing) const SyncingToast(),
           ],
-        ),
-      ),
+        );
+      },
     );
   }
 
@@ -507,38 +520,62 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
   }
 
   Widget _buildPhotoPlaceholder(String label) {
-    return GestureDetector(
-      onTap: _addPhoto,
-      child: Container(
-        width: 120,
-        height: 120,
-        decoration: BoxDecoration(
-          color: AppColors.white,
-          border: Border.all(
-            color: AppColors.divider,
-            style: BorderStyle.solid,
-            width: 2,
-          ),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(
-              Icons.add_photo_alternate_outlined,
-              size: 32,
-              color: AppColors.textSecondary,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              label,
-              textAlign: TextAlign.center,
-              style: AppTypography.bodyMedium.copyWith(
-                color: AppColors.textSecondary,
+    final isUploading = _isUploadingMedia;
+    return SizedBox(
+      width: 120,
+      height: 120,
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: GestureDetector(
+              onTap: isUploading ? null : _addPhoto,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: AppColors.white,
+                  border: Border.all(
+                    color: AppColors.divider,
+                    style: BorderStyle.solid,
+                    width: 2,
+                  ),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(
+                      Icons.add_photo_alternate_outlined,
+                      size: 32,
+                      color: AppColors.textSecondary,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      label,
+                      textAlign: TextAlign.center,
+                      style: AppTypography.bodyMedium.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
-          ],
-        ),
+          ),
+          if (isUploading)
+            Positioned.fill(
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.black45,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                alignment: Alignment.center,
+                child: const SizedBox(
+                  width: 28,
+                  height: 28,
+                  child: CircularProgressIndicator(strokeWidth: 3),
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -957,6 +994,12 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
   /// Save media locally and upload to Firebase Storage
   Future<void> _saveAndUploadMedia(XFile mediaFile,
       {required bool isVideo}) async {
+    if (mounted) {
+      setState(() {
+        _isUploadingMedia = true;
+      });
+    }
+
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) {
@@ -1086,6 +1129,12 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
           backgroundColor: AppColors.lava,
         ),
       );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isUploadingMedia = false;
+        });
+      }
     }
   }
 
