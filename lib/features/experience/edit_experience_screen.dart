@@ -15,6 +15,7 @@ import 'package:travel_connect/theme/colors.dart';
 import 'package:travel_connect/theme/typography.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:http/http.dart' as http;
+import 'package:travel_connect/widgets/syncing_toast.dart';
 
 class EditExperienceScreen extends StatefulWidget {
   const EditExperienceScreen({super.key, required this.experienceId});
@@ -30,6 +31,7 @@ class _EditExperienceScreenState extends State<EditExperienceScreen> {
   final ExperienceService _service = ExperienceService();
 
   bool _isLoading = true;
+  bool _isUploadingMedia = false;
 
   // Controllers mirroring create screen
   final _titleController = TextEditingController();
@@ -278,6 +280,12 @@ class _EditExperienceScreenState extends State<EditExperienceScreen> {
   /// Save media locally and upload to Firebase Storage
   Future<void> _saveAndUploadMedia(XFile mediaFile,
       {required bool isVideo}) async {
+    if (mounted) {
+      setState(() {
+        _isUploadingMedia = true;
+      });
+    }
+
     try {
       // Get current user
       final user = FirebaseAuth.instance.currentUser;
@@ -384,6 +392,12 @@ class _EditExperienceScreenState extends State<EditExperienceScreen> {
           backgroundColor: AppColors.lava,
         ),
       );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isUploadingMedia = false;
+        });
+      }
     }
   }
 
@@ -510,194 +524,243 @@ class _EditExperienceScreenState extends State<EditExperienceScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          'Edit Experience',
-          style: AppTypography.titleMedium.copyWith(color: AppColors.white),
-        ),
-        backgroundColor: AppColors.forestGreen,
-        actions: [
-          TextButton(
-            onPressed: _save,
-            child: Text('Save',
-                style: AppTypography.buttonMedium
-                    .copyWith(color: AppColors.white)),
-          )
-        ],
-      ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : Form(
-              key: _formKey,
-              child: ListView(
-                padding: const EdgeInsets.all(16),
-                children: [
-                  Text('Photos & Videos',
-                      style: AppTypography.titleSmall
-                          .copyWith(color: AppColors.textPrimary)),
-                  const SizedBox(height: 4),
-                  Text(
-                    'First upload must be a photo',
-                    style: AppTypography.bodySmall.copyWith(
-                      color: AppColors.textSecondary,
+    return ValueListenableBuilder<bool>(
+      valueListenable: ExperienceService.syncingNotifier,
+      builder: (context, isSyncing, _) {
+        return Stack(
+          children: [
+            Scaffold(
+              appBar: AppBar(
+                title: Text(
+                  'Edit Experience',
+                  style: AppTypography.titleMedium
+                      .copyWith(color: AppColors.white),
+                ),
+                backgroundColor: AppColors.forestGreen,
+                actions: [
+                  TextButton(
+                    onPressed: _save,
+                    child: Text(
+                      'Save',
+                      style: AppTypography.buttonMedium
+                          .copyWith(color: AppColors.white),
                     ),
-                  ),
-                  const SizedBox(height: 12),
-                  SizedBox(
-                    height: 120,
-                    child: ListView.separated(
-                      scrollDirection: Axis.horizontal,
-                      itemBuilder: (context, index) {
-                        // Always show the "Add Photo" button first
-                        if (index == 0) {
-                          return _buildAddPhotoButton();
-                        }
-                        // Then show uploaded media
-                        if (index - 1 < _imageUrls.length) {
-                          final url = _imageUrls[index - 1];
-                          return Stack(
-                            children: [
-                              Container(
-                                width: 120,
-                                child: ClipRRect(
-                                  borderRadius: BorderRadius.circular(8),
-                                  child: Image.network(url, fit: BoxFit.cover),
-                                ),
-                              ),
-                              Positioned(
-                                right: 4,
-                                top: 4,
-                                child: InkWell(
-                                  onTap: () => _removePhoto(url),
-                                  child: Container(
-                                    decoration: BoxDecoration(
-                                      color: Colors.black54,
-                                      borderRadius: BorderRadius.circular(16),
-                                    ),
-                                    padding: const EdgeInsets.all(4),
-                                    child: const Icon(Icons.close,
-                                        size: 18, color: Colors.white),
-                                  ),
-                                ),
-                              )
-                            ],
-                          );
-                        }
-                        return const SizedBox.shrink();
-                      },
-                      separatorBuilder: (_, __) => const SizedBox(width: 12),
-                      itemCount: _imageUrls.length + 1,
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  _buildTextField('Experience Title', _titleController,
-                      validator: (v) =>
-                          v == null || v.isEmpty ? 'Required' : null),
-                  const SizedBox(height: 20),
-                  _buildTextField('Description', _descriptionController,
-                      maxLines: 4,
-                      validator: (v) =>
-                          v == null || v.isEmpty ? 'Required' : null),
-                  const SizedBox(height: 20),
-                  _buildCategoryMultiSelect(),
-                  const SizedBox(height: 20),
-                  _buildTextField('Duration (hours)', _durationController,
-                      keyboardType: TextInputType.number,
-                      validator: _validateNonNegativeInt),
-                  const SizedBox(height: 20),
-                  _buildTextField('Price (COP)', _priceController,
-                      keyboardType: TextInputType.number,
-                      validator: _validateNonNegativeInt),
-                  const SizedBox(height: 20),
-                  _buildTextField('Max Group Size', _groupSizeController,
-                      keyboardType: TextInputType.number,
-                      validator: _validateNonNegativeInt),
-                  const SizedBox(height: 20),
-                  _buildLocationPicker(),
-                  const SizedBox(height: 20),
-                  _buildChipsSection(
-                    label: 'Languages',
-                    options: const ['es', 'en', 'pt', 'fr'],
-                    selected: _selectedLanguages,
-                    onToggle: (value) {
-                      setState(() {
-                        if (_selectedLanguages.contains(value)) {
-                          _selectedLanguages.remove(value);
-                        } else {
-                          _selectedLanguages.add(value);
-                        }
-                      });
-                    },
-                  ),
-                  const SizedBox(height: 20),
-                  _buildChipsSection(
-                    label: 'Payment Options',
-                    options: const ['cash', 'card'],
-                    selected: _selectedPaymentOptions,
-                    onToggle: (value) {
-                      setState(() {
-                        if (_selectedPaymentOptions.contains(value)) {
-                          _selectedPaymentOptions.remove(value);
-                        } else {
-                          _selectedPaymentOptions.add(value);
-                        }
-                      });
-                    },
-                  ),
-                  const SizedBox(height: 20),
-                  _buildChipsSection(
-                    label: 'Accessibility Features',
-                    options: const [
-                      'Wheelchair Access',
-                      'Elevator',
-                      'Accessible Parking',
-                      'Accessible Restroom',
-                      'Ramps',
-                      'Braille Signage',
-                      'Audio Guide',
-                      'Service Animals Allowed'
-                    ],
-                    selected: _selectedAccessibilityFeatures,
-                    onToggle: (value) {
-                      setState(() {
-                        if (_selectedAccessibilityFeatures.contains(value)) {
-                          _selectedAccessibilityFeatures.remove(value);
-                        } else {
-                          _selectedAccessibilityFeatures.add(value);
-                        }
-                      });
-                    },
-                  ),
+                  )
                 ],
               ),
+              body: _isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : Form(
+                      key: _formKey,
+                      child: ListView(
+                        padding: const EdgeInsets.all(16),
+                        children: [
+                          Text('Photos & Videos',
+                              style: AppTypography.titleSmall
+                                  .copyWith(color: AppColors.textPrimary)),
+                          const SizedBox(height: 4),
+                          Text(
+                            'First upload must be a photo',
+                            style: AppTypography.bodySmall.copyWith(
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          SizedBox(
+                            height: 120,
+                            child: ListView.separated(
+                              scrollDirection: Axis.horizontal,
+                              itemBuilder: (context, index) {
+                                if (index == 0) {
+                                  return _buildAddPhotoButton();
+                                }
+                                if (index - 1 < _imageUrls.length) {
+                                  final url = _imageUrls[index - 1];
+                                  return Stack(
+                                    children: [
+                                      Container(
+                                        width: 120,
+                                        child: ClipRRect(
+                                          borderRadius:
+                                              BorderRadius.circular(8),
+                                          child: Image.network(
+                                            url,
+                                            fit: BoxFit.cover,
+                                          ),
+                                        ),
+                                      ),
+                                      Positioned(
+                                        right: 4,
+                                        top: 4,
+                                        child: InkWell(
+                                          onTap: () => _removePhoto(url),
+                                          child: Container(
+                                            decoration: BoxDecoration(
+                                              color: Colors.black54,
+                                              borderRadius:
+                                                  BorderRadius.circular(16),
+                                            ),
+                                            padding: const EdgeInsets.all(4),
+                                            child: const Icon(
+                                              Icons.close,
+                                              size: 18,
+                                              color: Colors.white,
+                                            ),
+                                          ),
+                                        ),
+                                      )
+                                    ],
+                                  );
+                                }
+                                return const SizedBox.shrink();
+                              },
+                              separatorBuilder: (_, __) =>
+                                  const SizedBox(width: 12),
+                              itemCount: _imageUrls.length + 1,
+                            ),
+                          ),
+                          const SizedBox(height: 24),
+                          _buildTextField('Experience Title', _titleController,
+                              validator: (v) =>
+                                  v == null || v.isEmpty ? 'Required' : null),
+                          const SizedBox(height: 20),
+                          _buildTextField('Description', _descriptionController,
+                              maxLines: 4,
+                              validator: (v) =>
+                                  v == null || v.isEmpty ? 'Required' : null),
+                          const SizedBox(height: 20),
+                          _buildCategoryMultiSelect(),
+                          const SizedBox(height: 20),
+                          _buildTextField('Duration (hours)',
+                              _durationController,
+                              keyboardType: TextInputType.number,
+                              validator: _validateNonNegativeInt),
+                          const SizedBox(height: 20),
+                          _buildTextField('Price (COP)', _priceController,
+                              keyboardType: TextInputType.number,
+                              validator: _validateNonNegativeInt),
+                          const SizedBox(height: 20),
+                          _buildTextField(
+                              'Max Group Size', _groupSizeController,
+                              keyboardType: TextInputType.number,
+                              validator: _validateNonNegativeInt),
+                          const SizedBox(height: 20),
+                          _buildLocationPicker(),
+                          const SizedBox(height: 20),
+                          _buildChipsSection(
+                            label: 'Languages',
+                            options: const ['es', 'en', 'pt', 'fr'],
+                            selected: _selectedLanguages,
+                            onToggle: (value) {
+                              setState(() {
+                                if (_selectedLanguages.contains(value)) {
+                                  _selectedLanguages.remove(value);
+                                } else {
+                                  _selectedLanguages.add(value);
+                                }
+                              });
+                            },
+                          ),
+                          const SizedBox(height: 20),
+                          _buildChipsSection(
+                            label: 'Payment Options',
+                            options: const ['cash', 'card'],
+                            selected: _selectedPaymentOptions,
+                            onToggle: (value) {
+                              setState(() {
+                                if (_selectedPaymentOptions.contains(value)) {
+                                  _selectedPaymentOptions.remove(value);
+                                } else {
+                                  _selectedPaymentOptions.add(value);
+                                }
+                              });
+                            },
+                          ),
+                          const SizedBox(height: 20),
+                          _buildChipsSection(
+                            label: 'Accessibility Features',
+                            options: const [
+                              'Wheelchair Access',
+                              'Elevator',
+                              'Accessible Parking',
+                              'Accessible Restroom',
+                              'Ramps',
+                              'Braille Signage',
+                              'Audio Guide',
+                              'Service Animals Allowed'
+                            ],
+                            selected: _selectedAccessibilityFeatures,
+                            onToggle: (value) {
+                              setState(() {
+                                if (_selectedAccessibilityFeatures
+                                    .contains(value)) {
+                                  _selectedAccessibilityFeatures.remove(value);
+                                } else {
+                                  _selectedAccessibilityFeatures.add(value);
+                                }
+                              });
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
             ),
+            if (isSyncing) const SyncingToast(),
+          ],
+        );
+      },
     );
   }
 
   Widget _buildAddPhotoButton() {
-    return GestureDetector(
-      onTap: _addPhoto,
-      child: Container(
-        height: 120,
-        width: 120,
-        decoration: BoxDecoration(
-          color: AppColors.white,
-          border: Border.all(color: AppColors.divider, width: 2),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.add_photo_alternate_outlined,
-                size: 32, color: AppColors.textSecondary),
-            const SizedBox(height: 8),
-            Text('Add\nPhoto',
-                textAlign: TextAlign.center,
-                style: AppTypography.bodyMedium
-                    .copyWith(color: AppColors.textSecondary)),
-          ],
-        ),
+    final isUploading = _isUploadingMedia;
+    return SizedBox(
+      height: 120,
+      width: 120,
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: GestureDetector(
+              onTap: isUploading ? null : _addPhoto,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: AppColors.white,
+                  border: Border.all(color: AppColors.divider, width: 2),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.add_photo_alternate_outlined,
+                        size: 32, color: AppColors.textSecondary),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Add\nPhoto',
+                      textAlign: TextAlign.center,
+                      style: AppTypography.bodyMedium
+                          .copyWith(color: AppColors.textSecondary),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          if (isUploading)
+            Positioned.fill(
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.black45,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                alignment: Alignment.center,
+                child: const SizedBox(
+                  width: 28,
+                  height: 28,
+                  child: CircularProgressIndicator(strokeWidth: 3),
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }

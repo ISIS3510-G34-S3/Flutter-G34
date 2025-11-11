@@ -1,12 +1,17 @@
+import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
-import 'package:travel_connect/models/experience.dart' as models;
+import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
 import 'package:travel_connect/database/app_database.dart';
 import 'package:travel_connect/database/database_converters.dart';
-import 'package:connectivity_plus/connectivity_plus.dart';
-import 'dart:async';
-import 'dart:io';
+import 'package:travel_connect/models/experience.dart' as models;
+
 import 'pending_operations_service.dart';
 
 class ExperienceService {
@@ -26,6 +31,14 @@ class ExperienceService {
   StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
   bool _isSyncing = false;
   final Set<String> _hostMetadataEnsured = <String>{};
+
+  static final ValueNotifier<bool> syncingNotifier =
+      ValueNotifier<bool>(false);
+
+  static const String _placesApiKey = String.fromEnvironment(
+    'GOOGLE_PLACES_API_KEY',
+    defaultValue: 'AIzaSyA0TPkWq9uNvEA0Qhw2NVBihLbRTroYabE',
+  );
 
   /// Get experiences with offline-first strategy:
   /// 1. Try Firebase Cache (in-memory, fastest)
@@ -724,10 +737,14 @@ class ExperienceService {
       final pending = await _pendingOps.getPendingOperations();
       if (pending.isEmpty) {
         print('✓ No pending operations to sync');
+        if (syncingNotifier.value) {
+          syncingNotifier.value = false;
+        }
         _isSyncing = false;
         return;
       }
 
+      syncingNotifier.value = true;
       print('🔄 Syncing ${pending.length} pending operations...');
 
       for (final operation in pending) {
@@ -746,6 +763,7 @@ class ExperienceService {
             final allImages = [...existingImages, ...uploadedUrls];
             final updatedData = Map<String, dynamic>.from(operation.data);
             updatedData['images'] = allImages;
+            await _resolveLocationIfNeeded(updatedData);
 
             // Convert hostId string to DocumentReference
             if (updatedData['hostId'] is String) {
@@ -780,6 +798,8 @@ class ExperienceService {
                 final existingImages = (operation.data['images'] as List?)?.cast<String>() ?? [];
                 updatedData['images'] = [...existingImages, ...uploadedUrls];
               }
+
+              await _resolveLocationIfNeeded(updatedData);
 
               // Convert location map to GeoPoint if necessary
               if (updatedData['location'] is Map) {
@@ -822,6 +842,9 @@ class ExperienceService {
       print('✅ Sync complete');
     } finally {
       _isSyncing = false;
+      if (syncingNotifier.value) {
+        syncingNotifier.value = false;
+      }
     }
   }
 
@@ -868,5 +891,140 @@ class ExperienceService {
     }
 
     return downloadUrls;
+  }
+
+  Future<void> _resolveLocationIfNeeded(Map<String, dynamic> data) async {
+    final manualText = (data['manualLocationText'] ?? '') as String? ?? '';
+    final trimmedText = manualText.trim();
+    final needsGeocodingFlag = data['needsGeocoding'] == true;
+    final locationMap = data['location'];
+
+    bool hasZeroLocation = false;
+    if (locationMap is Map) {
+      final latValue = locationMap['latitude'] ?? locationMap['lat'];
+      final lngValue = locationMap['longitude'] ?? locationMap['lng'];
+      if (latValue is num && lngValue is num) {
+        hasZeroLocation = latValue == 0 && lngValue == 0;
+      }
+    }
+
+    if ((!needsGeocodingFlag && !hasZeroLocation) || trimmedText.isEmpty) {
+      return;
+    }
+    if (_placesApiKey.isEmpty) {
+      return;
+    }
+
+    try {
+      final suggestion = await _fetchFirstPlaceSuggestion(trimmedText);
+      final placeId = suggestion?['place_id'] as String?;
+      if (placeId == null || placeId.isEmpty) {
+        return;
+      }
+
+      final details = await _fetchPlaceDetails(placeId);
+      if (details == null) {
+        return;
+      }
+
+      final double? lat = details['lat'] as double?;
+      final double? lng = details['lng'] as double?;
+
+      if (lat == null || lng == null) {
+        return;
+      }
+
+      data['location'] = {
+        'latitude': lat,
+        'longitude': lng,
+      };
+
+      final department = details['department'] as String?;
+      if (department != null && department.isNotEmpty) {
+        data['department'] = department;
+      }
+
+      data['needsGeocoding'] = false;
+      data['manualLocationText'] = trimmedText;
+    } catch (e) {
+      print('⚠️ Failed to geocode manual location "$trimmedText": $e');
+    }
+  }
+
+  Future<Map<String, dynamic>?> _fetchFirstPlaceSuggestion(String input) async {
+    final uri = Uri.parse(
+      'https://maps.googleapis.com/maps/api/place/autocomplete/json'
+      '?input=${Uri.encodeQueryComponent(input)}&types=geocode&key=$_placesApiKey',
+    );
+
+    final response = await http.get(uri).timeout(const Duration(seconds: 6));
+    if (response.statusCode != 200) {
+      return null;
+    }
+
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    if (data['status'] != 'OK') {
+      return null;
+    }
+
+    final predictions = (data['predictions'] as List?) ?? const [];
+    if (predictions.isEmpty) {
+      return null;
+    }
+
+    final first = predictions.first;
+    if (first is Map) {
+      return Map<String, dynamic>.from(first);
+    }
+    return null;
+  }
+
+  Future<Map<String, dynamic>?> _fetchPlaceDetails(String placeId) async {
+    final uri = Uri.parse(
+      'https://maps.googleapis.com/maps/api/place/details/json'
+      '?place_id=${Uri.encodeQueryComponent(placeId)}'
+      '&fields=geometry,address_components&key=$_placesApiKey',
+    );
+
+    final response = await http.get(uri).timeout(const Duration(seconds: 6));
+    if (response.statusCode != 200) {
+      return null;
+    }
+
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    if (data['status'] != 'OK') {
+      return null;
+    }
+
+    final result = (data['result'] as Map?) ?? const {};
+    final geometry = (result['geometry'] as Map?) ?? const {};
+    final location = (geometry['location'] as Map?) ?? const {};
+
+    final lat = location['lat'];
+    final lng = location['lng'];
+
+    if (lat is! num || lng is! num) {
+      return null;
+    }
+
+    String? department;
+    final components = (result['address_components'] as List?) ?? const [];
+    for (final component in components) {
+      if (component is! Map) continue;
+      final types = (component['types'] as List?)?.cast<String>() ?? const [];
+      if (types.contains('administrative_area_level_1')) {
+        department = component['long_name'] as String?;
+        break;
+      }
+    }
+
+    final num latNum = lat;
+    final num lngNum = lng;
+
+    return <String, dynamic>{
+      'lat': latNum.toDouble(),
+      'lng': lngNum.toDouble(),
+      'department': department,
+    };
   }
 }
