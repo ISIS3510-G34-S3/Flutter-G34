@@ -36,12 +36,17 @@ class _MyExperiencesScreenState extends State<MyExperiencesScreen> {
     );
     if (confirmed == true) {
       try {
-        await _service.deleteExperienceAndImages(exp.id);
+        final wasOnline = await _service.deleteExperienceAndImages(
+          exp.id,
+          imageUrls: List<String>.from(exp.images),
+        );
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              'Deleted',
+              wasOnline
+                  ? 'Deleted'
+                  : 'Deletion queued offline. Will sync when online.',
               style: AppTypography.bodyMedium.copyWith(color: AppColors.white),
             ),
             backgroundColor: AppColors.forestGreen,

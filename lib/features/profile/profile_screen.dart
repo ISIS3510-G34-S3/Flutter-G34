@@ -5,7 +5,16 @@ import '../../theme/colors.dart';
 import '../../theme/typography.dart';
 import '../../models/host.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+<<<<<<< HEAD
 import '../../widgets/connectivity_wrapper.dart';
+=======
+import 'package:image_picker/image_picker.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:drift/drift.dart' as drift;
+import '../../services/profile_picture_service.dart';
+import '../../database/app_database.dart';
+>>>>>>> main
 
 /// Profile screen showing user information and verification status
 class ProfileScreen extends StatefulWidget {
@@ -22,6 +31,270 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> with ConnectivityAware {
   final HostService _hostService = HostService();
+  final ProfilePictureService _profilePictureService = ProfilePictureService();
+  bool _isUploadingPhoto = false;
+
+  /// Show dialog to choose photo source
+  Future<void> _showPhotoUploadDialog(Host user) async {
+    await showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          backgroundColor: AppColors.white,
+          title: Text(
+            'Profile Picture',
+            style: AppTypography.titleMedium.copyWith(
+              color: AppColors.textPrimary,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppColors.forestGreen.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(
+                    Icons.camera_alt,
+                    color: AppColors.forestGreen,
+                    size: 24,
+                  ),
+                ),
+                title: Text(
+                  'Take Photo',
+                  style: AppTypography.bodyLarge.copyWith(
+                    color: AppColors.textPrimary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _uploadProfilePicture(ImageSource.camera, user);
+                },
+              ),
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppColors.oliveGold.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(
+                    Icons.photo_library,
+                    color: AppColors.oliveGold,
+                    size: 24,
+                  ),
+                ),
+                title: Text(
+                  'Choose from Gallery',
+                  style: AppTypography.bodyLarge.copyWith(
+                    color: AppColors.textPrimary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _uploadProfilePicture(ImageSource.gallery, user);
+                },
+              ),
+              if (user.photoURL != null && user.photoURL!.isNotEmpty)
+                ListTile(
+                  leading: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: AppColors.lava.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(
+                      Icons.delete_outline,
+                      color: AppColors.lava,
+                      size: 24,
+                    ),
+                  ),
+                  title: Text(
+                    'Remove Photo',
+                    style: AppTypography.bodyLarge.copyWith(
+                      color: AppColors.lava,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    _removeProfilePicture(user);
+                  },
+                ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text(
+                'Cancel',
+                style: AppTypography.bodyLarge.copyWith(
+                  color: AppColors.textSecondary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  /// Upload profile picture
+  Future<void> _uploadProfilePicture(ImageSource source, Host user) async {
+    setState(() {
+      _isUploadingPhoto = true;
+    });
+
+    try {
+      final String? photoURL =
+          await _profilePictureService.uploadProfilePicture(source: source);
+
+      if (photoURL != null) {
+        // Delete old profile picture if it exists
+        await _profilePictureService.deleteOldProfilePicture(user.photoURL);
+
+        if (!mounted) return;
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Profile picture updated successfully!'),
+            backgroundColor: AppColors.forestGreen,
+          ),
+        );
+
+        // Refresh the profile to show new picture
+        setState(() {
+          _isUploadingPhoto = false;
+        });
+      } else {
+        if (!mounted) return;
+        setState(() {
+          _isUploadingPhoto = false;
+        });
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isUploadingPhoto = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to upload profile picture: $e'),
+          backgroundColor: AppColors.lava,
+        ),
+      );
+    }
+  }
+
+  /// Remove profile picture
+  Future<void> _removeProfilePicture(Host user) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(
+          'Remove Profile Picture',
+          style: AppTypography.titleMedium.copyWith(
+            color: AppColors.textPrimary,
+          ),
+        ),
+        content: Text(
+          'Are you sure you want to remove your profile picture?',
+          style: AppTypography.bodyMedium.copyWith(
+            color: AppColors.textPrimary,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text(
+              'Cancel',
+              style: AppTypography.buttonMedium.copyWith(
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: Text(
+              'Remove',
+              style: AppTypography.buttonMedium.copyWith(
+                color: AppColors.lava,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      setState(() {
+        _isUploadingPhoto = true;
+      });
+
+      try {
+        // Delete old profile picture
+        await _profilePictureService.deleteOldProfilePicture(user.photoURL);
+
+        // Update Firestore and local database to remove photoURL
+        final authUser = FirebaseAuth.instance.currentUser;
+        if (authUser != null) {
+          final docId = (authUser.email ?? '').toLowerCase().isNotEmpty
+              ? (authUser.email ?? '').toLowerCase()
+              : authUser.uid;
+
+          // Update Firestore
+          await FirebaseFirestore.instance
+              .collection('users')
+              .doc(docId)
+              .update({
+            'photoURL': FieldValue.delete(),
+          });
+
+          // Update local database
+          final db = AppDatabase();
+          await db.upsertUser(
+            UsersCompanion(
+              id: drift.Value(docId),
+              photoURL: const drift.Value(null),
+              isDirty: const drift.Value(false),
+              lastSyncedAt: drift.Value(DateTime.now()),
+            ),
+          );
+        }
+
+        if (!mounted) return;
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Profile picture removed successfully!'),
+            backgroundColor: AppColors.forestGreen,
+          ),
+        );
+
+        setState(() {
+          _isUploadingPhoto = false;
+        });
+      } catch (e) {
+        if (!mounted) return;
+        setState(() {
+          _isUploadingPhoto = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to remove profile picture: $e'),
+            backgroundColor: AppColors.lava,
+          ),
+        );
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -103,18 +376,71 @@ class _ProfileScreenState extends State<ProfileScreen> with ConnectivityAware {
         padding: const EdgeInsets.all(20),
         child: Row(
           children: [
-            // Avatar placeholder
-            Container(
-              width: 80,
-              height: 80,
-              decoration: BoxDecoration(
-                color: AppColors.peach.withValues(alpha: 0.3),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                Icons.person_outline,
-                size: 40,
-                color: AppColors.oliveGold.withValues(alpha: 0.7),
+            // Avatar with upload functionality
+            GestureDetector(
+              onTap: () => _showPhotoUploadDialog(user),
+              child: Stack(
+                children: [
+                  Container(
+                    width: 80,
+                    height: 80,
+                    decoration: BoxDecoration(
+                      color: AppColors.peach.withValues(alpha: 0.3),
+                      shape: BoxShape.circle,
+                    ),
+                    child: _isUploadingPhoto
+                        ? const Center(
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                            ),
+                          )
+                        : user.photoURL != null && user.photoURL!.isNotEmpty
+                            ? ClipOval(
+                                child: CachedNetworkImage(
+                                  imageUrl: user.photoURL!,
+                                  fit: BoxFit.cover,
+                                  placeholder: (context, url) => const Center(
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  ),
+                                  errorWidget: (context, url, error) => Icon(
+                                    Icons.person_outline,
+                                    size: 40,
+                                    color: AppColors.oliveGold
+                                        .withValues(alpha: 0.7),
+                                  ),
+                                ),
+                              )
+                            : Icon(
+                                Icons.person_outline,
+                                size: 40,
+                                color:
+                                    AppColors.oliveGold.withValues(alpha: 0.7),
+                              ),
+                  ),
+                  if (!_isUploadingPhoto)
+                    Positioned(
+                      bottom: 0,
+                      right: 0,
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          color: AppColors.forestGreen,
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: AppColors.white,
+                            width: 2,
+                          ),
+                        ),
+                        child: const Icon(
+                          Icons.camera_alt,
+                          size: 16,
+                          color: AppColors.white,
+                        ),
+                      ),
+                    ),
+                ],
               ),
             ),
 

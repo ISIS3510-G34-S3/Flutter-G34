@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -8,10 +10,12 @@ import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import '../../mock/mock_data.dart' as mock;
 import '../../services/image_processing_service.dart';
-import 'package:travel_connect/models/experience.dart';
 import 'package:travel_connect/services/experience_service.dart';
 import 'package:travel_connect/theme/colors.dart';
 import 'package:travel_connect/theme/typography.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:http/http.dart' as http;
+import 'package:travel_connect/widgets/syncing_toast.dart';
 
 class EditExperienceScreen extends StatefulWidget {
   const EditExperienceScreen({super.key, required this.experienceId});
@@ -26,8 +30,8 @@ class _EditExperienceScreenState extends State<EditExperienceScreen> {
   final _formKey = GlobalKey<FormState>();
   final ExperienceService _service = ExperienceService();
 
-  Experience? _experience;
   bool _isLoading = true;
+  bool _isUploadingMedia = false;
 
   // Controllers mirroring create screen
   final _titleController = TextEditingController();
@@ -44,10 +48,24 @@ class _EditExperienceScreenState extends State<EditExperienceScreen> {
 
   GeoPoint? _geoPoint;
   String? _department;
+  final TextEditingController _locationController = TextEditingController();
+  List<Map<String, dynamic>> _placeSuggestions = [];
+  bool _isFetchingPlaces = false;
+  Timer? _placesDebounce;
+  bool _hasConnectivity = true;
+  String? _manualLocation;
+
+  static const String _placesApiKey = String.fromEnvironment(
+      'GOOGLE_PLACES_API_KEY',
+      defaultValue: 'AIzaSyA0TPkWq9uNvEA0Qhw2NVBihLbRTroYabE');
 
   @override
   void initState() {
     super.initState();
+    // Start monitoring connectivity for auto-sync
+    _service.startConnectivityMonitoring();
+    _checkInitialConnectivity();
+    _listenToConnectivity();
     _load();
   }
 
@@ -55,7 +73,6 @@ class _EditExperienceScreenState extends State<EditExperienceScreen> {
     final exp = await _service.getExperienceById(widget.experienceId);
     if (!mounted) return;
     setState(() {
-      _experience = exp;
       _isLoading = false;
     });
     if (exp != null) {
@@ -72,7 +89,53 @@ class _EditExperienceScreenState extends State<EditExperienceScreen> {
       _imageUrls.addAll(exp.images);
       _geoPoint = exp.location;
       _department = exp.department;
+      _locationController.text =
+          _department?.isNotEmpty == true ? _department! : '';
+      if (_locationController.text.isEmpty && _geoPoint != null) {
+        _locationController.text =
+            '${_geoPoint!.latitude.toStringAsFixed(4)}, ${_geoPoint!.longitude.toStringAsFixed(4)}';
+      }
+      try {
+        final doc = await FirebaseFirestore.instance
+            .collection('experiences')
+            .doc(widget.experienceId)
+            .get();
+        final manualText = doc.data()?['manualLocationText'] as String?;
+        if (manualText != null && manualText.isNotEmpty && mounted) {
+          setState(() {
+            _manualLocation = manualText;
+            _locationController.text = manualText;
+            _geoPoint = const GeoPoint(0, 0);
+          });
+        }
+      } catch (_) {
+        // ignore manual text lookup failures
+      }
     }
+  }
+
+  void _checkInitialConnectivity() async {
+    final hasInternet = await _service.hasConnectivity();
+    if (mounted) {
+      setState(() {
+        _hasConnectivity = hasInternet;
+      });
+    }
+  }
+
+  void _listenToConnectivity() {
+    _service.connectivity.onConnectivityChanged.listen((results) {
+      final isConnected =
+          results.any((result) => result != ConnectivityResult.none);
+      if (mounted) {
+        setState(() {
+          _hasConnectivity = isConnected;
+          if (isConnected) {
+            _manualLocation = null;
+          }
+        });
+      }
+    });
   }
 
   @override
@@ -82,6 +145,8 @@ class _EditExperienceScreenState extends State<EditExperienceScreen> {
     _durationController.dispose();
     _priceController.dispose();
     _groupSizeController.dispose();
+    _locationController.dispose();
+    _placesDebounce?.cancel();
     super.dispose();
   }
 
@@ -215,6 +280,12 @@ class _EditExperienceScreenState extends State<EditExperienceScreen> {
   /// Save media locally and upload to Firebase Storage
   Future<void> _saveAndUploadMedia(XFile mediaFile,
       {required bool isVideo}) async {
+    if (mounted) {
+      setState(() {
+        _isUploadingMedia = true;
+      });
+    }
+
     try {
       // Get current user
       final user = FirebaseAuth.instance.currentUser;
@@ -284,9 +355,13 @@ class _EditExperienceScreenState extends State<EditExperienceScreen> {
         _imageUrls.add(downloadUrl);
       });
 
-      await _service.updateExperience(widget.experienceId, {
-        'images': _imageUrls,
-      });
+      final wasOnline = await _service.updateExperienceOfflineCapable(
+        widget.experienceId,
+        {
+          'images': List<String>.from(_imageUrls),
+          'updatedAt': DateTime.now().toIso8601String(),
+        },
+      );
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -298,6 +373,17 @@ class _EditExperienceScreenState extends State<EditExperienceScreen> {
           backgroundColor: AppColors.forestGreen,
         ),
       );
+      if (!wasOnline && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Changes saved offline. Will sync when online.',
+              style: AppTypography.bodyMedium.copyWith(color: AppColors.white),
+            ),
+            backgroundColor: AppColors.forestGreen,
+          ),
+        );
+      }
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -306,6 +392,12 @@ class _EditExperienceScreenState extends State<EditExperienceScreen> {
           backgroundColor: AppColors.lava,
         ),
       );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isUploadingMedia = false;
+        });
+      }
     }
   }
 
@@ -334,33 +426,94 @@ class _EditExperienceScreenState extends State<EditExperienceScreen> {
     setState(() {
       _imageUrls.remove(url);
     });
-    await _service.updateExperience(widget.experienceId, {
-      'images': _imageUrls,
-    });
+    final wasOnline = await _service.updateExperienceOfflineCapable(
+      widget.experienceId,
+      {
+        'images': List<String>.from(_imageUrls),
+        'updatedAt': DateTime.now().toIso8601String(),
+      },
+    );
+
+    if (!mounted) return;
+    if (!wasOnline) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Changes saved offline. Will sync when online.',
+            style: AppTypography.bodyMedium.copyWith(color: AppColors.white),
+          ),
+          backgroundColor: AppColors.forestGreen,
+        ),
+      );
+    }
   }
 
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
+    final locationInput = _locationController.text.trim();
+    if (_geoPoint == null && locationInput.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Please provide a location',
+            style: AppTypography.bodyMedium.copyWith(color: AppColors.white),
+          ),
+          backgroundColor: AppColors.lava,
+        ),
+      );
+      return;
+    }
+
+    final bool usingManual = !_hasConnectivity ||
+        (_manualLocation != null && _manualLocation!.trim().isNotEmpty);
+    if (usingManual) {
+      _geoPoint = const GeoPoint(0, 0);
+      if (locationInput.isNotEmpty) {
+        _department = locationInput;
+      }
+    }
+
     final Map<String, dynamic> updates = {
       'title': _titleController.text.trim(),
       'summary': _descriptionController.text.trim(),
       'duration': int.tryParse(_durationController.text.trim()) ?? 0,
       'priceCOP': int.tryParse(_priceController.text.trim()) ?? 0,
       'groupSizeMax': int.tryParse(_groupSizeController.text.trim()) ?? 0,
-      'categories': _selectedCategories,
-      'languages': _selectedLanguages,
-      'paymentOptions': _selectedPaymentOptions,
-      'accessibilityFeatures': _selectedAccessibilityFeatures,
-      'images': _imageUrls,
+      'categories': List<String>.from(_selectedCategories),
+      'languages': List<String>.from(_selectedLanguages),
+      'paymentOptions': List<String>.from(_selectedPaymentOptions),
+      'accessibilityFeatures':
+          List<String>.from(_selectedAccessibilityFeatures),
+      'images': List<String>.from(_imageUrls),
       'department': _department ?? '',
-      'location': _geoPoint,
+      'updatedAt': DateTime.now().toIso8601String(),
+      'needsGeocoding': usingManual,
     };
-    await _service.updateExperience(widget.experienceId, updates);
+    if (_geoPoint != null) {
+      updates['location'] = {
+        'latitude': _geoPoint!.latitude,
+        'longitude': _geoPoint!.longitude,
+      };
+    }
+    if (locationInput.isNotEmpty) {
+      updates['manualLocationText'] = locationInput;
+    }
+
+    // Use offline-capable service method
+    final wasOnline = await _service.updateExperienceOfflineCapable(
+        widget.experienceId, updates);
+
     if (!mounted) return;
+    
+    // Show appropriate message based on connectivity
+    final message = wasOnline
+        ? 'Experience updated'
+        : 'Experience saved offline. Will sync when online.';
+    
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          'Experience updated',
+          message,
           style: AppTypography.bodyMedium.copyWith(color: AppColors.white),
         ),
         backgroundColor: AppColors.forestGreen,
@@ -371,192 +524,243 @@ class _EditExperienceScreenState extends State<EditExperienceScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          'Edit Experience',
-          style: AppTypography.titleMedium.copyWith(color: AppColors.white),
-        ),
-        backgroundColor: AppColors.forestGreen,
-        actions: [
-          TextButton(
-            onPressed: _save,
-            child: Text('Save',
-                style: AppTypography.buttonMedium
-                    .copyWith(color: AppColors.white)),
-          )
-        ],
-      ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : Form(
-              key: _formKey,
-              child: ListView(
-                padding: const EdgeInsets.all(16),
-                children: [
-                  Text('Photos & Videos',
-                      style: AppTypography.titleSmall
-                          .copyWith(color: AppColors.textPrimary)),
-                  const SizedBox(height: 4),
-                  Text(
-                    'First upload must be a photo',
-                    style: AppTypography.bodySmall.copyWith(
-                      color: AppColors.textSecondary,
+    return ValueListenableBuilder<bool>(
+      valueListenable: ExperienceService.syncingNotifier,
+      builder: (context, isSyncing, _) {
+        return Stack(
+          children: [
+            Scaffold(
+              appBar: AppBar(
+                title: Text(
+                  'Edit Experience',
+                  style: AppTypography.titleMedium
+                      .copyWith(color: AppColors.white),
+                ),
+                backgroundColor: AppColors.forestGreen,
+                actions: [
+                  TextButton(
+                    onPressed: _save,
+                    child: Text(
+                      'Save',
+                      style: AppTypography.buttonMedium
+                          .copyWith(color: AppColors.white),
                     ),
-                  ),
-                  const SizedBox(height: 12),
-                  SizedBox(
-                    height: 120,
-                    child: ListView.separated(
-                      scrollDirection: Axis.horizontal,
-                      itemBuilder: (context, index) {
-                        // Always show the "Add Photo" button first
-                        if (index == 0) {
-                          return _buildAddPhotoButton();
-                        }
-                        // Then show uploaded media
-                        if (index - 1 < _imageUrls.length) {
-                          final url = _imageUrls[index - 1];
-                          return Stack(
-                            children: [
-                              Container(
-                                width: 120,
-                                child: ClipRRect(
-                                  borderRadius: BorderRadius.circular(8),
-                                  child: Image.network(url, fit: BoxFit.cover),
-                                ),
-                              ),
-                              Positioned(
-                                right: 4,
-                                top: 4,
-                                child: InkWell(
-                                  onTap: () => _removePhoto(url),
-                                  child: Container(
-                                    decoration: BoxDecoration(
-                                      color: Colors.black54,
-                                      borderRadius: BorderRadius.circular(16),
-                                    ),
-                                    padding: const EdgeInsets.all(4),
-                                    child: const Icon(Icons.close,
-                                        size: 18, color: Colors.white),
-                                  ),
-                                ),
-                              )
-                            ],
-                          );
-                        }
-                        return const SizedBox.shrink();
-                      },
-                      separatorBuilder: (_, __) => const SizedBox(width: 12),
-                      itemCount: _imageUrls.length + 1,
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  _buildTextField('Experience Title', _titleController,
-                      validator: (v) =>
-                          v == null || v.isEmpty ? 'Required' : null),
-                  const SizedBox(height: 20),
-                  _buildTextField('Description', _descriptionController,
-                      maxLines: 4,
-                      validator: (v) =>
-                          v == null || v.isEmpty ? 'Required' : null),
-                  const SizedBox(height: 20),
-                  _buildCategoryMultiSelect(),
-                  const SizedBox(height: 20),
-                  _buildTextField('Duration (hours)', _durationController,
-                      keyboardType: TextInputType.number,
-                      validator: _validateNonNegativeInt),
-                  const SizedBox(height: 20),
-                  _buildTextField('Price (COP)', _priceController,
-                      keyboardType: TextInputType.number,
-                      validator: _validateNonNegativeInt),
-                  const SizedBox(height: 20),
-                  _buildTextField('Max Group Size', _groupSizeController,
-                      keyboardType: TextInputType.number,
-                      validator: _validateNonNegativeInt),
-                  const SizedBox(height: 20),
-                  _buildChipsSection(
-                    label: 'Languages',
-                    options: const ['es', 'en', 'pt', 'fr'],
-                    selected: _selectedLanguages,
-                    onToggle: (value) {
-                      setState(() {
-                        if (_selectedLanguages.contains(value)) {
-                          _selectedLanguages.remove(value);
-                        } else {
-                          _selectedLanguages.add(value);
-                        }
-                      });
-                    },
-                  ),
-                  const SizedBox(height: 20),
-                  _buildChipsSection(
-                    label: 'Payment Options',
-                    options: const ['cash', 'card'],
-                    selected: _selectedPaymentOptions,
-                    onToggle: (value) {
-                      setState(() {
-                        if (_selectedPaymentOptions.contains(value)) {
-                          _selectedPaymentOptions.remove(value);
-                        } else {
-                          _selectedPaymentOptions.add(value);
-                        }
-                      });
-                    },
-                  ),
-                  const SizedBox(height: 20),
-                  _buildChipsSection(
-                    label: 'Accessibility Features',
-                    options: const [
-                      'Wheelchair Access',
-                      'Elevator',
-                      'Accessible Parking',
-                      'Accessible Restroom',
-                      'Ramps',
-                      'Braille Signage',
-                      'Audio Guide',
-                      'Service Animals Allowed'
-                    ],
-                    selected: _selectedAccessibilityFeatures,
-                    onToggle: (value) {
-                      setState(() {
-                        if (_selectedAccessibilityFeatures.contains(value)) {
-                          _selectedAccessibilityFeatures.remove(value);
-                        } else {
-                          _selectedAccessibilityFeatures.add(value);
-                        }
-                      });
-                    },
-                  ),
+                  )
                 ],
               ),
+              body: _isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : Form(
+                      key: _formKey,
+                      child: ListView(
+                        padding: const EdgeInsets.all(16),
+                        children: [
+                          Text('Photos & Videos',
+                              style: AppTypography.titleSmall
+                                  .copyWith(color: AppColors.textPrimary)),
+                          const SizedBox(height: 4),
+                          Text(
+                            'First upload must be a photo',
+                            style: AppTypography.bodySmall.copyWith(
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          SizedBox(
+                            height: 120,
+                            child: ListView.separated(
+                              scrollDirection: Axis.horizontal,
+                              itemBuilder: (context, index) {
+                                if (index == 0) {
+                                  return _buildAddPhotoButton();
+                                }
+                                if (index - 1 < _imageUrls.length) {
+                                  final url = _imageUrls[index - 1];
+                                  return Stack(
+                                    children: [
+                                      Container(
+                                        width: 120,
+                                        child: ClipRRect(
+                                          borderRadius:
+                                              BorderRadius.circular(8),
+                                          child: Image.network(
+                                            url,
+                                            fit: BoxFit.cover,
+                                          ),
+                                        ),
+                                      ),
+                                      Positioned(
+                                        right: 4,
+                                        top: 4,
+                                        child: InkWell(
+                                          onTap: () => _removePhoto(url),
+                                          child: Container(
+                                            decoration: BoxDecoration(
+                                              color: Colors.black54,
+                                              borderRadius:
+                                                  BorderRadius.circular(16),
+                                            ),
+                                            padding: const EdgeInsets.all(4),
+                                            child: const Icon(
+                                              Icons.close,
+                                              size: 18,
+                                              color: Colors.white,
+                                            ),
+                                          ),
+                                        ),
+                                      )
+                                    ],
+                                  );
+                                }
+                                return const SizedBox.shrink();
+                              },
+                              separatorBuilder: (_, __) =>
+                                  const SizedBox(width: 12),
+                              itemCount: _imageUrls.length + 1,
+                            ),
+                          ),
+                          const SizedBox(height: 24),
+                          _buildTextField('Experience Title', _titleController,
+                              validator: (v) =>
+                                  v == null || v.isEmpty ? 'Required' : null),
+                          const SizedBox(height: 20),
+                          _buildTextField('Description', _descriptionController,
+                              maxLines: 4,
+                              validator: (v) =>
+                                  v == null || v.isEmpty ? 'Required' : null),
+                          const SizedBox(height: 20),
+                          _buildCategoryMultiSelect(),
+                          const SizedBox(height: 20),
+                          _buildTextField('Duration (hours)',
+                              _durationController,
+                              keyboardType: TextInputType.number,
+                              validator: _validateNonNegativeInt),
+                          const SizedBox(height: 20),
+                          _buildTextField('Price (COP)', _priceController,
+                              keyboardType: TextInputType.number,
+                              validator: _validateNonNegativeInt),
+                          const SizedBox(height: 20),
+                          _buildTextField(
+                              'Max Group Size', _groupSizeController,
+                              keyboardType: TextInputType.number,
+                              validator: _validateNonNegativeInt),
+                          const SizedBox(height: 20),
+                          _buildLocationPicker(),
+                          const SizedBox(height: 20),
+                          _buildChipsSection(
+                            label: 'Languages',
+                            options: const ['es', 'en', 'pt', 'fr'],
+                            selected: _selectedLanguages,
+                            onToggle: (value) {
+                              setState(() {
+                                if (_selectedLanguages.contains(value)) {
+                                  _selectedLanguages.remove(value);
+                                } else {
+                                  _selectedLanguages.add(value);
+                                }
+                              });
+                            },
+                          ),
+                          const SizedBox(height: 20),
+                          _buildChipsSection(
+                            label: 'Payment Options',
+                            options: const ['cash', 'card'],
+                            selected: _selectedPaymentOptions,
+                            onToggle: (value) {
+                              setState(() {
+                                if (_selectedPaymentOptions.contains(value)) {
+                                  _selectedPaymentOptions.remove(value);
+                                } else {
+                                  _selectedPaymentOptions.add(value);
+                                }
+                              });
+                            },
+                          ),
+                          const SizedBox(height: 20),
+                          _buildChipsSection(
+                            label: 'Accessibility Features',
+                            options: const [
+                              'Wheelchair Access',
+                              'Elevator',
+                              'Accessible Parking',
+                              'Accessible Restroom',
+                              'Ramps',
+                              'Braille Signage',
+                              'Audio Guide',
+                              'Service Animals Allowed'
+                            ],
+                            selected: _selectedAccessibilityFeatures,
+                            onToggle: (value) {
+                              setState(() {
+                                if (_selectedAccessibilityFeatures
+                                    .contains(value)) {
+                                  _selectedAccessibilityFeatures.remove(value);
+                                } else {
+                                  _selectedAccessibilityFeatures.add(value);
+                                }
+                              });
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
             ),
+            if (isSyncing) const SyncingToast(),
+          ],
+        );
+      },
     );
   }
 
   Widget _buildAddPhotoButton() {
-    return GestureDetector(
-      onTap: _addPhoto,
-      child: Container(
-        height: 120,
-        width: 120,
-        decoration: BoxDecoration(
-          color: AppColors.white,
-          border: Border.all(color: AppColors.divider, width: 2),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.add_photo_alternate_outlined,
-                size: 32, color: AppColors.textSecondary),
-            const SizedBox(height: 8),
-            Text('Add\nPhoto',
-                textAlign: TextAlign.center,
-                style: AppTypography.bodyMedium
-                    .copyWith(color: AppColors.textSecondary)),
-          ],
-        ),
+    final isUploading = _isUploadingMedia;
+    return SizedBox(
+      height: 120,
+      width: 120,
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: GestureDetector(
+              onTap: isUploading ? null : _addPhoto,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: AppColors.white,
+                  border: Border.all(color: AppColors.divider, width: 2),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.add_photo_alternate_outlined,
+                        size: 32, color: AppColors.textSecondary),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Add\nPhoto',
+                      textAlign: TextAlign.center,
+                      style: AppTypography.bodyMedium
+                          .copyWith(color: AppColors.textSecondary),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          if (isUploading)
+            Positioned.fill(
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.black45,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                alignment: Alignment.center,
+                child: const SizedBox(
+                  width: 28,
+                  height: 28,
+                  child: CircularProgressIndicator(strokeWidth: 3),
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -588,6 +792,167 @@ class _EditExperienceScreenState extends State<EditExperienceScreen> {
       ],
     );
   }
+
+  Widget _buildLocationPicker() {
+    final useManualMode = !_hasConnectivity || _placesApiKey.isEmpty;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Location',
+          style: AppTypography.labelLarge.copyWith(
+            color: AppColors.textPrimary,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 8),
+        TextFormField(
+          controller: _locationController,
+          decoration: InputDecoration(
+            hintText:
+                useManualMode ? 'Enter location (e.g., Bogotá)' : 'Search a place',
+            prefixIcon: Icon(useManualMode ? Icons.edit_location : Icons.search),
+          ),
+          onChanged: (value) {
+            if (useManualMode) {
+              setState(() {
+                _manualLocation = value.trim();
+                if (_manualLocation != null && _manualLocation!.isNotEmpty) {
+                  _geoPoint = const GeoPoint(0, 0);
+                }
+                _placeSuggestions = [];
+              });
+            } else {
+              _onPlaceQueryChanged(value);
+            }
+          },
+          validator: (value) {
+            if ((value ?? '').trim().isEmpty && _geoPoint == null) {
+              return 'Please provide a location';
+            }
+            return null;
+          },
+        ),
+        const SizedBox(height: 8),
+        if (!useManualMode && _isFetchingPlaces)
+          const LinearProgressIndicator(minHeight: 2),
+        if (!useManualMode && _placeSuggestions.isNotEmpty)
+          Container(
+            decoration: BoxDecoration(
+              color: AppColors.white,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: AppColors.divider),
+            ),
+            constraints: const BoxConstraints(maxHeight: 240),
+            child: ListView.builder(
+              shrinkWrap: true,
+              itemCount: _placeSuggestions.length,
+              itemBuilder: (context, index) {
+                final suggestion = _placeSuggestions[index];
+                return ListTile(
+                  dense: true,
+                  title: Text(
+                    (suggestion['description'] as String?) ?? '',
+                    style: AppTypography.bodyMedium
+                        .copyWith(color: AppColors.textPrimary),
+                  ),
+                  onTap: () async {
+                    final placeId = suggestion['place_id'] as String?;
+                    if (placeId != null) {
+                      final details = await _fetchPlaceDetails(placeId);
+                      if (!mounted) return;
+                      setState(() {
+                        _geoPoint = GeoPoint(
+                          (details['lat'] as num).toDouble(),
+                          (details['lng'] as num).toDouble(),
+                        );
+                        _department = details['department'] as String?;
+                        _locationController.text =
+                            suggestion['description'] as String? ?? '';
+                        _manualLocation = null;
+                        _placeSuggestions = [];
+                      });
+                    }
+                  },
+                );
+              },
+            ),
+          ),
+        if (useManualMode)
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Text(
+              'Enter location as text. GPS coordinates will be added when synced.',
+              style: AppTypography.bodySmall.copyWith(
+                color: AppColors.textSecondary,
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  void _onPlaceQueryChanged(String value) {
+    _placesDebounce?.cancel();
+    if (_placesApiKey.isEmpty) return;
+    if (value.trim().isEmpty) {
+      setState(() {
+        _placeSuggestions = [];
+      });
+      return;
+    }
+    _placesDebounce = Timer(const Duration(milliseconds: 350), () async {
+      setState(() {
+        _isFetchingPlaces = true;
+      });
+      final results = await _fetchPlaceSuggestions(value.trim());
+      if (!mounted) return;
+      setState(() {
+        _placeSuggestions = results;
+        _isFetchingPlaces = false;
+      });
+    });
+  }
+
+  Future<List<Map<String, dynamic>>> _fetchPlaceSuggestions(
+      String input) async {
+    final uri = Uri.parse(
+        'https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${Uri.encodeQueryComponent(input)}&types=geocode&key=$_placesApiKey');
+    final res = await http.get(uri);
+    if (res.statusCode != 200) return [];
+    final data = json.decode(res.body) as Map<String, dynamic>;
+    final preds = (data['predictions'] as List? ?? []).cast<Map>();
+    return preds.map((e) => Map<String, dynamic>.from(e)).toList();
+  }
+
+  Future<Map<String, dynamic>> _fetchPlaceDetails(String placeId) async {
+    final uri = Uri.parse(
+        'https://maps.googleapis.com/maps/api/place/details/json?place_id=$placeId&fields=geometry,address_components&key=$_placesApiKey');
+    final res = await http.get(uri);
+    if (res.statusCode != 200) {
+      return {'lat': 0.0, 'lng': 0.0, 'department': null};
+    }
+    final data = json.decode(res.body) as Map<String, dynamic>;
+    final result = (data['result'] as Map?) ?? {};
+    final loc = ((result['geometry'] as Map?)?['location'] as Map?) ?? {};
+    final comps = (result['address_components'] as List?)?.cast<Map>() ?? [];
+    String? admin1;
+    for (final c in comps) {
+      final types = (c['types'] as List?)?.cast<String>() ?? [];
+      if (types.contains('administrative_area_level_1')) {
+        admin1 = c['long_name'] as String?;
+        break;
+      }
+    }
+    return {
+      'lat': (loc['lat'] as num?)?.toDouble() ?? 0.0,
+      'lng': (loc['lng'] as num?)?.toDouble() ?? 0.0,
+      'department': admin1,
+    };
+  }
+
 
   Widget _buildCategoryMultiSelect() {
     return Column(
