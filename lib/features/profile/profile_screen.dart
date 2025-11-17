@@ -5,16 +5,13 @@ import '../../theme/colors.dart';
 import '../../theme/typography.dart';
 import '../../models/host.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-<<<<<<< HEAD
 import '../../widgets/connectivity_wrapper.dart';
-=======
 import 'package:image_picker/image_picker.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:drift/drift.dart' as drift;
 import '../../services/profile_picture_service.dart';
 import '../../database/app_database.dart';
->>>>>>> main
 
 /// Profile screen showing user information and verification status
 class ProfileScreen extends StatefulWidget {

@@ -20,7 +20,9 @@ TravelConnect is a mobile application that allows users to discover, share, and 
 - **Offline-First Architecture**: Full offline support with local SQLite database using Drift
 - **Smart Data Sync**: Multi-layer caching strategy (Firebase Cache → Local DB → Firebase Server)
 - **Battery Efficient**: Intelligent background sync without periodic polling
-- **Connectivity Awareness**: Real-time network status monitoring with offline indicators
+- **Enterprise Connectivity**: HTTP reachability testing that works in airplane mode with WiFi
+- **Universal Protection**: All 16 screens protected with connectivity awareness
+- **Consistent UI**: Olive-gold offline banners across the entire app
 - **Pull-to-Refresh**: Swipe down to manually refresh experiences from server
 - **Multi-Currency Support**: Choose your preferred currency with daily exchange rate updates
 - **Smart Price Display**: Automatic conversion of all prices to selected currency

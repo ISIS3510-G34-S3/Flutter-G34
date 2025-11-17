@@ -154,33 +154,7 @@ class _ChatbotScreenState extends State<ChatbotScreen> with ConnectivityAware {
       ),
       body: Column(
         children: [
-          // Connectivity status banner
-          if (!isOnline)
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              color: Colors.orange.withOpacity(0.9),
-              child: const Row(
-                children: [
-                  Icon(
-                    Icons.cloud_off,
-                    color: Colors.white,
-                    size: 20,
-                  ),
-                  SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      'No internet connection - Messages cannot be sent',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
+          buildOfflineBanner(),
 
           // Messages list
           Expanded(

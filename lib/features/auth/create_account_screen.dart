@@ -72,6 +72,8 @@ class _CreateAccountScreenState extends State<CreateAccountScreen>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                buildOfflineBanner(),
+
                 // User type selection
                 _buildUserTypeSelection(),
 

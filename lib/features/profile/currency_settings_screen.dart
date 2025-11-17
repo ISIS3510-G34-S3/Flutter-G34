@@ -4,6 +4,7 @@ import '../../services/currency_service.dart';
 import '../../theme/colors.dart';
 import '../../theme/typography.dart';
 import 'package:intl/intl.dart';
+import '../../widgets/connectivity_wrapper.dart';
 
 /// Currency Settings Screen - allows users to select their preferred currency
 class CurrencySettingsScreen extends StatefulWidget {
@@ -13,7 +14,8 @@ class CurrencySettingsScreen extends StatefulWidget {
   State<CurrencySettingsScreen> createState() => _CurrencySettingsScreenState();
 }
 
-class _CurrencySettingsScreenState extends State<CurrencySettingsScreen> {
+class _CurrencySettingsScreenState extends State<CurrencySettingsScreen>
+    with ConnectivityAware {
   bool _isRefreshing = false;
 
   @override
@@ -36,6 +38,8 @@ class _CurrencySettingsScreenState extends State<CurrencySettingsScreen> {
             child: ListView(
               padding: const EdgeInsets.all(16),
               children: [
+                buildOfflineBanner(),
+
                 // Header card with info
                 _buildInfoCard(currencyService),
                 const SizedBox(height: 20),

@@ -4,6 +4,7 @@ import '../../theme/colors.dart';
 import '../../theme/typography.dart';
 import '../../widgets/experience_card.dart';
 import '../../widgets/filters_bottom_sheet.dart';
+import '../../widgets/connectivity_wrapper.dart';
 import 'discover_view_model.dart';
 
 /// Discover screen with search, filters, and experience listings
@@ -14,7 +15,8 @@ class DiscoverScreen extends StatefulWidget {
   State<DiscoverScreen> createState() => _DiscoverScreenState();
 }
 
-class _DiscoverScreenState extends State<DiscoverScreen> {
+class _DiscoverScreenState extends State<DiscoverScreen>
+    with ConnectivityAware {
   final _searchController = TextEditingController();
   late DiscoverViewModel _viewModel;
 

@@ -7,6 +7,7 @@ import '../../services/image_processing_service.dart';
 import '../../services/experience_service.dart';
 import '../../services/host_preferences_service.dart';
 import '../../widgets/syncing_toast.dart';
+import '../../widgets/connectivity_wrapper.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:convert';
@@ -27,7 +28,8 @@ class CreateExperienceScreen extends StatefulWidget {
   State<CreateExperienceScreen> createState() => _CreateExperienceScreenState();
 }
 
-class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
+class _CreateExperienceScreenState extends State<CreateExperienceScreen>
+    with ConnectivityAware {
   final _formKey = GlobalKey<FormState>();
   final ExperienceService _experienceService = ExperienceService();
   final HostPreferencesService _hostPrefs = HostPreferencesService();
@@ -270,6 +272,8 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
                 child: ListView(
                   padding: const EdgeInsets.all(16),
                   children: [
+                    buildOfflineBanner(),
+
                     // Photo upload section
                     _buildPhotoSection(),
 
@@ -325,7 +329,8 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
                       controller: _priceController,
                       hint: 'e.g. 120000',
                       allowNegative: false,
-                      validatorMessage: 'Please enter a valid non-negative price',
+                      validatorMessage:
+                          'Please enter a valid non-negative price',
                     ),
 
                     const SizedBox(height: 20),
@@ -701,7 +706,7 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
   Widget _buildLocationPicker() {
     // Use manual mode when offline or no API key
     final useManualMode = !_hasConnectivity || _placesApiKey.isEmpty;
-    
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -716,10 +721,11 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
         TextFormField(
           controller: _locationSearchController,
           decoration: InputDecoration(
-            hintText: useManualMode 
+            hintText: useManualMode
                 ? 'Enter location (e.g., Salento, Quindío)'
                 : 'Search a place',
-            prefixIcon: Icon(useManualMode ? Icons.edit_location : Icons.search),
+            prefixIcon:
+                Icon(useManualMode ? Icons.edit_location : Icons.search),
           ),
           onChanged: (value) {
             if (useManualMode) {
@@ -738,7 +744,7 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
           },
         ),
         const SizedBox(height: 8),
-        if (!useManualMode && _isFetchingPlaces) 
+        if (!useManualMode && _isFetchingPlaces)
           const LinearProgressIndicator(minHeight: 2),
         if (!useManualMode && _placeSuggestions.isNotEmpty)
           Container(
@@ -1149,12 +1155,12 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
 
     try {
       // Validate location
-      if (_selectedGeoPoint == null && 
+      if (_selectedGeoPoint == null &&
           (_manualLocation == null || _manualLocation!.isEmpty) &&
           _locationSearchController.text.trim().isEmpty) {
         throw Exception('Please enter a location');
       }
-      
+
       if (_selectedCategories.isEmpty) {
         throw Exception('Please select at least one category');
       }
@@ -1172,7 +1178,7 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
       final hostDocId = (authUser.email ?? '').toLowerCase().isNotEmpty
           ? (authUser.email ?? '').toLowerCase()
           : authUser.uid;
-      
+
       // Fetch host data only if online
       Map<String, dynamic> hostData = {'isVerified': false}; // Default
       if (_hasConnectivity) {
@@ -1207,12 +1213,13 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
           int.tryParse(_groupSizeController.text.trim()) ?? 0;
 
       // Use GeoPoint if available, otherwise use placeholder (0,0) for manual location
-      final GeoPoint locationGeoPoint = _selectedGeoPoint ?? const GeoPoint(0, 0);
-      
+      final GeoPoint locationGeoPoint =
+          _selectedGeoPoint ?? const GeoPoint(0, 0);
+
       // Determine location text: use manual input or selected label
-      final locationText = _manualLocation ?? 
-                          _locationSearchController.text.trim();
-      
+      final locationText =
+          _manualLocation ?? _locationSearchController.text.trim();
+
       final Map<String, dynamic> experience = {
         'title': title,
         'summary': summary,
@@ -1245,7 +1252,8 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
                 .where((e) => e.isNotEmpty)
                 .toList()
             : skillsToLearn,
-        'createdAt': DateTime.now().toIso8601String(), // Use ISO string for offline
+        'createdAt':
+            DateTime.now().toIso8601String(), // Use ISO string for offline
         'updatedAt': DateTime.now().toIso8601String(),
       };
 
@@ -1256,14 +1264,11 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
       }
 
       // Get local image paths that haven't been uploaded yet
-      final localImagePaths = _localPhotos
-          .map((file) => file.path)
-          .toList();
+      final localImagePaths = _localPhotos.map((file) => file.path).toList();
 
       // Use offline-capable service method
-      final experienceId =
-          await _experienceService.createExperienceOfflineCapable(
-              experience, localImagePaths);
+      final experienceId = await _experienceService
+          .createExperienceOfflineCapable(experience, localImagePaths);
 
       await _hostPrefs.saveLanguages(_selectedLanguages);
 
@@ -1280,7 +1285,7 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen> {
       final message = experienceId != null
           ? 'Experience created successfully!'
           : 'Experience saved offline. Will sync when online.';
-      
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(

@@ -39,6 +39,8 @@ class _LoginScreenState extends State<LoginScreen> with ConnectivityAware {
         child: SingleChildScrollView(
           child: Column(
             children: [
+              buildOfflineBanner(),
+
               // Hero section with gradient
               _buildHeroSection(),
 
