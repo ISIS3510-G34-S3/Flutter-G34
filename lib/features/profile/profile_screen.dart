@@ -5,15 +5,22 @@ import '../../theme/colors.dart';
 import '../../theme/typography.dart';
 import '../../models/host.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import '../../widgets/connectivity_wrapper.dart';
 
 /// Profile screen showing user information and verification status
-class ProfileScreen extends StatelessWidget {
-  ProfileScreen({
+class ProfileScreen extends StatefulWidget {
+  const ProfileScreen({
     super.key,
     required this.profileId,
   });
 
   final String profileId;
+
+  @override
+  State<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends State<ProfileScreen> with ConnectivityAware {
   final HostService _hostService = HostService();
 
   @override
@@ -64,6 +71,7 @@ class ProfileScreen extends StatelessWidget {
           return ListView(
             padding: const EdgeInsets.all(16),
             children: [
+              buildOfflineBanner(),
               _buildProfileHeader(user),
               const SizedBox(height: 16),
               if (!user.isVerified) _buildVerificationBanner(context),

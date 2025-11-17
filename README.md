@@ -391,6 +391,18 @@ For more information about Flutter development, visit the [Flutter documentation
 
 ## 🎯 Recent Enhancements
 
+### Enterprise-Grade Connectivity (Nov 2025)
+
+- **Airplane Mode Detection**: HTTP reachability testing works even with WiFi in airplane mode
+- **Smart Retry Logic**: Exponential backoff (1s, 2s) with 5-second timeouts per request
+- **Dual-Layer Verification**: Device state check + quick HTTP ping to Google, then parallel checks to Cloudflare/Amazon
+- **Optimistic Start**: Assumes online initially for better UX, verifies in background
+- **Offline-First Integration**: Respects existing 3-layer caching (Firebase cache → Local DB → Firebase server)
+- **Smart Protection**: ConnectivityAware mixin checks before online operations (booking, messaging, CRUD) while allowing cached data access
+- **Consistent UI Across App**: All screens use the same subtle olive-gold banner style from Discover screen - "No internet connection - using offline data"
+- **Soft Offline Blocker**: When blocking is needed, shows friendly "Connection needed" message with subtle olive-gold colors (no harsh red)
+- **Friendly Feedback**: Rounded floating snackbars with soft colors for action-specific warnings
+
 ### Experience Detail Screen
 
 - **Comprehensive Information Display**: Added price formatting (e.g., "120K COP"), duration, max group size, and categories

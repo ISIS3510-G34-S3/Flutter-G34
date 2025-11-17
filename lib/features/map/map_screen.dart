@@ -7,6 +7,7 @@ import '../../theme/typography.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:location/location.dart';
 import '../../widgets/filters_bottom_sheet.dart';
+import '../../widgets/connectivity_wrapper.dart';
 
 /// Map screen showing experience locations with pins
 class MapScreen extends StatefulWidget {
@@ -16,7 +17,7 @@ class MapScreen extends StatefulWidget {
   State<MapScreen> createState() => _MapScreenState();
 }
 
-class _MapScreenState extends State<MapScreen> {
+class _MapScreenState extends State<MapScreen> with ConnectivityAware {
   Experience? _selectedExperience;
   GoogleMapController? _mapController;
   final Set<Marker> _markers = {};
@@ -149,7 +150,8 @@ class _MapScreenState extends State<MapScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Unable to get your location. Please enable location services.'),
+            content: Text(
+                'Unable to get your location. Please enable location services.'),
             duration: Duration(seconds: 3),
           ),
         );
@@ -183,6 +185,14 @@ class _MapScreenState extends State<MapScreen> {
       ),
       body: Stack(
         children: [
+          // Offline banner
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: buildOfflineBanner(),
+          ),
+
           // Google Map
           GoogleMap(
             onMapCreated: (GoogleMapController controller) {
@@ -224,8 +234,6 @@ class _MapScreenState extends State<MapScreen> {
       ),
     );
   }
-
-
 
   Widget _buildZoomControls() {
     return Positioned(
@@ -475,7 +483,8 @@ class _MapScreenState extends State<MapScreen> {
           minPrice: 0,
           maxPrice: 0,
           allExperiences: _allExperiences,
-          onApplyFilters: (categories, regions, _languages, _minPrice, _maxPrice) {
+          onApplyFilters:
+              (categories, regions, _languages, _minPrice, _maxPrice) {
             setState(() {
               _selectedCategories = List.from(categories);
               _selectedRegions = List.from(regions);
@@ -491,9 +500,8 @@ class _MapScreenState extends State<MapScreen> {
     List<Experience> result = List.from(_allExperiences);
 
     if (_selectedRegions.isNotEmpty) {
-      result = result
-          .where((e) => _selectedRegions.contains(e.department))
-          .toList();
+      result =
+          result.where((e) => _selectedRegions.contains(e.department)).toList();
     }
 
     if (_selectedCategories.isNotEmpty) {
@@ -535,7 +543,8 @@ class _MapScreenState extends State<MapScreen> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Unable to get your location. Please enable location services.'),
+              content: Text(
+                  'Unable to get your location. Please enable location services.'),
               duration: Duration(seconds: 3),
             ),
           );
@@ -548,5 +557,3 @@ class _MapScreenState extends State<MapScreen> {
     context.push('/experience/$experienceId');
   }
 }
-
-

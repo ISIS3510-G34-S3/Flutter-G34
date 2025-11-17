@@ -8,6 +8,7 @@ import 'package:travel_connect/theme/colors.dart';
 import 'package:travel_connect/theme/typography.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:travel_connect/widgets/experience_card.dart';
+import 'package:travel_connect/widgets/connectivity_wrapper.dart';
 
 class HostScreen extends StatefulWidget {
   final String hostId;
@@ -17,7 +18,7 @@ class HostScreen extends StatefulWidget {
   State<HostScreen> createState() => _HostScreenState();
 }
 
-class _HostScreenState extends State<HostScreen> {
+class _HostScreenState extends State<HostScreen> with ConnectivityAware {
   final HostService _hostService = HostService();
   final ExperienceService _experienceService = ExperienceService();
   Host? _host;
@@ -95,6 +96,7 @@ class _HostScreenState extends State<HostScreen> {
               : ListView(
                   padding: const EdgeInsets.all(16),
                   children: [
+                    buildOfflineBanner(),
                     _buildProfileHeader(_host!),
                     const SizedBox(height: 16),
                     _buildRatingSection(_host!),
@@ -127,9 +129,10 @@ class _HostScreenState extends State<HostScreen> {
               child: CircleAvatar(
                 radius: 40,
                 backgroundColor: AppColors.peach.withOpacity(0.3),
-                backgroundImage: host.photoURL != null && host.photoURL!.isNotEmpty
-                    ? CachedNetworkImageProvider(host.photoURL!)
-                    : null,
+                backgroundImage:
+                    host.photoURL != null && host.photoURL!.isNotEmpty
+                        ? CachedNetworkImageProvider(host.photoURL!)
+                        : null,
                 child: host.photoURL == null || host.photoURL!.isEmpty
                     ? Text(
                         host.name.isNotEmpty ? host.name[0].toUpperCase() : '?',
@@ -267,7 +270,8 @@ class _HostScreenState extends State<HostScreen> {
       children: [
         Card(
           elevation: 1,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
@@ -305,7 +309,8 @@ class _HostScreenState extends State<HostScreen> {
         else if (_hostExperiences.isEmpty)
           Card(
             elevation: 1,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             child: Padding(
               padding: const EdgeInsets.all(32.0),
               child: Center(
@@ -369,7 +374,8 @@ class _HostScreenState extends State<HostScreen> {
         const SizedBox(height: 4),
         Text(
           label,
-          style: AppTypography.bodyMedium.copyWith(color: AppColors.textSecondary),
+          style:
+              AppTypography.bodyMedium.copyWith(color: AppColors.textSecondary),
         ),
       ],
     );
