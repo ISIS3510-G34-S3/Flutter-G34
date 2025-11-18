@@ -8,9 +8,8 @@ import 'package:travel_connect/services/host_service.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../../theme/colors.dart';
 import '../../theme/typography.dart';
-
-import '../experience/booking_screen.dart';
 import '../../widgets/currency_price.dart';
+import '../../widgets/connectivity_wrapper.dart';
 
 /// Experience detail screen with comprehensive information
 class ExperienceDetailScreen extends StatefulWidget {
@@ -25,7 +24,8 @@ class ExperienceDetailScreen extends StatefulWidget {
   State<ExperienceDetailScreen> createState() => _ExperienceDetailScreenState();
 }
 
-class _ExperienceDetailScreenState extends State<ExperienceDetailScreen> {
+class _ExperienceDetailScreenState extends State<ExperienceDetailScreen>
+    with ConnectivityAware {
   final ExperienceService _experienceService = ExperienceService();
   final HostService _hostService = HostService();
   Experience? _experience;
@@ -101,6 +101,9 @@ class _ExperienceDetailScreenState extends State<ExperienceDetailScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // Offline banner
+                buildOfflineBanner(),
+
                 // Title and rating section
                 _buildTitleSection(_experience!),
 
@@ -149,16 +152,6 @@ class _ExperienceDetailScreenState extends State<ExperienceDetailScreen> {
       // Bottom action bar
       bottomNavigationBar: _buildBottomActions(context, _experience!),
     );
-  }
-
-  /// Format price for display
-  String _formatPrice(int price) {
-    if (price >= 1000000) {
-      return '${(price / 1000000).toStringAsFixed(1)}M';
-    } else if (price >= 1000) {
-      return '${(price / 1000).toStringAsFixed(0)}K';
-    }
-    return price.toString();
   }
 
   Widget _buildPhotoGallery(Experience experience) {

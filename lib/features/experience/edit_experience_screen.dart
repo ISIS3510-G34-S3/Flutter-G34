@@ -16,6 +16,7 @@ import 'package:travel_connect/theme/typography.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:http/http.dart' as http;
 import 'package:travel_connect/widgets/syncing_toast.dart';
+import '../../widgets/connectivity_wrapper.dart';
 
 class EditExperienceScreen extends StatefulWidget {
   const EditExperienceScreen({super.key, required this.experienceId});
@@ -26,7 +27,8 @@ class EditExperienceScreen extends StatefulWidget {
   State<EditExperienceScreen> createState() => _EditExperienceScreenState();
 }
 
-class _EditExperienceScreenState extends State<EditExperienceScreen> {
+class _EditExperienceScreenState extends State<EditExperienceScreen>
+    with ConnectivityAware {
   final _formKey = GlobalKey<FormState>();
   final ExperienceService _service = ExperienceService();
 
@@ -504,12 +506,12 @@ class _EditExperienceScreenState extends State<EditExperienceScreen> {
         widget.experienceId, updates);
 
     if (!mounted) return;
-    
+
     // Show appropriate message based on connectivity
     final message = wasOnline
         ? 'Experience updated'
         : 'Experience saved offline. Will sync when online.';
-    
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
@@ -555,6 +557,7 @@ class _EditExperienceScreenState extends State<EditExperienceScreen> {
                       child: ListView(
                         padding: const EdgeInsets.all(16),
                         children: [
+                          buildOfflineBanner(),
                           Text('Photos & Videos',
                               style: AppTypography.titleSmall
                                   .copyWith(color: AppColors.textPrimary)),
@@ -631,8 +634,8 @@ class _EditExperienceScreenState extends State<EditExperienceScreen> {
                           const SizedBox(height: 20),
                           _buildCategoryMultiSelect(),
                           const SizedBox(height: 20),
-                          _buildTextField('Duration (hours)',
-                              _durationController,
+                          _buildTextField(
+                              'Duration (hours)', _durationController,
                               keyboardType: TextInputType.number,
                               validator: _validateNonNegativeInt),
                           const SizedBox(height: 20),
@@ -810,9 +813,11 @@ class _EditExperienceScreenState extends State<EditExperienceScreen> {
         TextFormField(
           controller: _locationController,
           decoration: InputDecoration(
-            hintText:
-                useManualMode ? 'Enter location (e.g., Bogotá)' : 'Search a place',
-            prefixIcon: Icon(useManualMode ? Icons.edit_location : Icons.search),
+            hintText: useManualMode
+                ? 'Enter location (e.g., Bogotá)'
+                : 'Search a place',
+            prefixIcon:
+                Icon(useManualMode ? Icons.edit_location : Icons.search),
           ),
           onChanged: (value) {
             if (useManualMode) {
@@ -952,7 +957,6 @@ class _EditExperienceScreenState extends State<EditExperienceScreen> {
       'department': admin1,
     };
   }
-
 
   Widget _buildCategoryMultiSelect() {
     return Column(

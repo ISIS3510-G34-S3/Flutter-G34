@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import '../../theme/colors.dart';
 import '../../theme/typography.dart';
 import '../../mock/mock_data.dart';
+import '../../widgets/connectivity_wrapper.dart';
 
 /// Profile verification screen for identity verification process
 class ProfileVerificationScreen extends StatefulWidget {
@@ -13,7 +14,8 @@ class ProfileVerificationScreen extends StatefulWidget {
       _ProfileVerificationScreenState();
 }
 
-class _ProfileVerificationScreenState extends State<ProfileVerificationScreen> {
+class _ProfileVerificationScreenState extends State<ProfileVerificationScreen>
+    with ConnectivityAware {
   int _currentStep = 0;
   bool _isLoading = false;
 
@@ -69,6 +71,8 @@ class _ProfileVerificationScreenState extends State<ProfileVerificationScreen> {
       ),
       body: Column(
         children: [
+          buildOfflineBanner(),
+
           // Progress header
           _buildProgressHeader(user),
 
@@ -268,9 +272,7 @@ class _ProfileVerificationScreenState extends State<ProfileVerificationScreen> {
                           shape: BoxShape.circle,
                         ),
                         child: Icon(
-                          step.isCompleted
-                              ? Icons.check
-                              : step.icon,
+                          step.isCompleted ? Icons.check : step.icon,
                           size: 20,
                           color: step.isCompleted || isActive
                               ? AppColors.white
@@ -493,9 +495,9 @@ class _ProfileVerificationScreenState extends State<ProfileVerificationScreen> {
             ],
           ),
         ),
-        
+
         const SizedBox(height: 24),
-        
+
         // Proof of Address Upload
         GestureDetector(
           onTap: () {

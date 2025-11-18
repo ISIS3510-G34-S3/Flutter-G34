@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:travel_connect/models/experience.dart';
+import '../../widgets/connectivity_wrapper.dart';
 import 'package:travel_connect/services/experience_service.dart';
 import '../../theme/colors.dart';
 import '../../theme/typography.dart';
@@ -19,7 +20,7 @@ class BookingScreen extends StatefulWidget {
   State<BookingScreen> createState() => _BookingScreenState();
 }
 
-class _BookingScreenState extends State<BookingScreen> {
+class _BookingScreenState extends State<BookingScreen> with ConnectivityAware {
   final ExperienceService _experienceService = ExperienceService();
   Experience? _experience;
   bool _isLoading = true;
@@ -86,6 +87,9 @@ class _BookingScreenState extends State<BookingScreen> {
       ),
       body: Column(
         children: [
+          // Offline banner
+          buildOfflineBanner(),
+
           // Experience info header
           Container(
             padding: const EdgeInsets.all(16),
@@ -487,6 +491,11 @@ class _BookingScreenState extends State<BookingScreen> {
           child: ElevatedButton(
             onPressed: selectedDate != null
                 ? () {
+                    if (!isOnline) {
+                      showOfflineSnackbar(
+                          'Booking requires an internet connection.');
+                      return;
+                    }
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
                         content: Text(

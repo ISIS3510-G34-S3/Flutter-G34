@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../services/local_media_service.dart';
 import '../../theme/colors.dart';
 import '../../theme/typography.dart';
+import '../../widgets/connectivity_wrapper.dart';
 
 /// Screen to view and manage locally stored media files
 class LocalMediaScreen extends StatefulWidget {
@@ -13,7 +14,8 @@ class LocalMediaScreen extends StatefulWidget {
   State<LocalMediaScreen> createState() => _LocalMediaScreenState();
 }
 
-class _LocalMediaScreenState extends State<LocalMediaScreen> {
+class _LocalMediaScreenState extends State<LocalMediaScreen>
+    with ConnectivityAware {
   final LocalMediaService _mediaService = LocalMediaService();
   List<File> _mediaFiles = [];
   bool _isLoading = true;
@@ -157,6 +159,8 @@ class _LocalMediaScreenState extends State<LocalMediaScreen> {
           ? const Center(child: CircularProgressIndicator())
           : Column(
               children: [
+                buildOfflineBanner(),
+
                 // Storage info card
                 Container(
                   margin: const EdgeInsets.all(16),

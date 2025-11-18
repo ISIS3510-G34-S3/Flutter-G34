@@ -20,7 +20,9 @@ TravelConnect is a mobile application that allows users to discover, share, and 
 - **Offline-First Architecture**: Full offline support with local SQLite database using Drift
 - **Smart Data Sync**: Multi-layer caching strategy (Firebase Cache → Local DB → Firebase Server)
 - **Battery Efficient**: Intelligent background sync without periodic polling
-- **Connectivity Awareness**: Real-time network status monitoring with offline indicators
+- **Enterprise Connectivity**: HTTP reachability testing that works in airplane mode with WiFi
+- **Universal Protection**: All 16 screens protected with connectivity awareness
+- **Consistent UI**: Olive-gold offline banners across the entire app
 - **Pull-to-Refresh**: Swipe down to manually refresh experiences from server
 - **Multi-Currency Support**: Choose your preferred currency with daily exchange rate updates
 - **Smart Price Display**: Automatic conversion of all prices to selected currency
@@ -395,16 +397,17 @@ For more information about Flutter development, visit the [Flutter documentation
 
 ## 🎯 Recent Enhancements
 
-### Profile Picture Management
+### Enterprise-Grade Connectivity (Nov 2025)
 
-- **Upload from Camera or Gallery**: Take a new photo or select from existing images
-- **Image Optimization**: Automatic compression and resizing (1024x1024) for optimal performance
-- **Local Storage**: Profile pictures saved to "Travel Connect" folder alongside experience photos
-- **Firebase Integration**: Uploaded to Firebase Storage under `experiences/{userId}/` (uses same security rules as experience photos)
-- **Remove Picture**: Option to delete profile picture with confirmation
-- **Real-time Updates**: Instant UI refresh showing new profile picture
-- **Offline Support**: Profile picture URLs cached in local database for offline access
-- **Multi-threaded Processing**: Image compression runs in isolates to avoid UI blocking
+- **Airplane Mode Detection**: HTTP reachability testing works even with WiFi in airplane mode
+- **Smart Retry Logic**: Exponential backoff (1s, 2s) with 5-second timeouts per request
+- **Dual-Layer Verification**: Device state check + quick HTTP ping to Google, then parallel checks to Cloudflare/Amazon
+- **Optimistic Start**: Assumes online initially for better UX, verifies in background
+- **Offline-First Integration**: Respects existing 3-layer caching (Firebase cache → Local DB → Firebase server)
+- **Smart Protection**: ConnectivityAware mixin checks before online operations (booking, messaging, CRUD) while allowing cached data access
+- **Consistent UI Across App**: All screens use the same subtle olive-gold banner style from Discover screen - "No internet connection - using offline data"
+- **Soft Offline Blocker**: When blocking is needed, shows friendly "Connection needed" message with subtle olive-gold colors (no harsh red)
+- **Friendly Feedback**: Rounded floating snackbars with soft colors for action-specific warnings
 
 ### Experience Detail Screen
 

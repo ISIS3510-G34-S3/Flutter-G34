@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../services/chatbot_service.dart';
-import '../../services/connectivity_service.dart';
 import '../../widgets/experience_card.dart';
+import '../../widgets/connectivity_wrapper.dart';
 
 class ChatbotScreen extends StatefulWidget {
   const ChatbotScreen({super.key});
@@ -11,28 +11,16 @@ class ChatbotScreen extends StatefulWidget {
   State<ChatbotScreen> createState() => _ChatbotScreenState();
 }
 
-class _ChatbotScreenState extends State<ChatbotScreen> {
+class _ChatbotScreenState extends State<ChatbotScreen> with ConnectivityAware {
   final ChatbotService _chatbotService = ChatbotService();
-  final ConnectivityService _connectivityService = ConnectivityService();
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final List<ChatMessage> _messages = [];
   bool _isLoading = false;
-  bool _isOnline = true;
 
   @override
   void initState() {
     super.initState();
-    // Check initial connectivity
-    _checkConnectivity();
-    // Start monitoring connectivity changes
-    _connectivityService.startMonitoring((isOnline) {
-      if (mounted) {
-        setState(() {
-          _isOnline = isOnline;
-        });
-      }
-    });
     // Add welcome message
     _messages.add(
       ChatMessage(
@@ -44,20 +32,10 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
     );
   }
 
-  Future<void> _checkConnectivity() async {
-    final isOnline = await _connectivityService.checkConnectivity();
-    if (mounted) {
-      setState(() {
-        _isOnline = isOnline;
-      });
-    }
-  }
-
   @override
   void dispose() {
     _messageController.dispose();
     _scrollController.dispose();
-    _connectivityService.stopMonitoring();
     super.dispose();
   }
 
@@ -66,23 +44,9 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
     if (message.isEmpty) return;
 
     // Check connectivity before sending
-    if (!_isOnline) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Row(
-            children: [
-              Icon(Icons.cloud_off, color: Colors.white),
-              SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                    'No internet connection. Please check your network and try again.'),
-              ),
-            ],
-          ),
-          backgroundColor: Colors.red,
-          duration: Duration(seconds: 3),
-        ),
-      );
+    if (!isOnline) {
+      showOfflineSnackbar(
+          'Chatbot requires an internet connection to respond.');
       return;
     }
 
@@ -190,33 +154,7 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
       ),
       body: Column(
         children: [
-          // Connectivity status banner
-          if (!_isOnline)
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              color: Colors.orange.withOpacity(0.9),
-              child: const Row(
-                children: [
-                  Icon(
-                    Icons.cloud_off,
-                    color: Colors.white,
-                    size: 20,
-                  ),
-                  SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      'No internet connection - Messages cannot be sent',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
+          buildOfflineBanner(),
 
           // Messages list
           Expanded(
@@ -310,7 +248,7 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
                     child: IconButton(
                       icon: const Icon(Icons.send, color: Colors.white),
                       onPressed:
-                          (_isLoading || !_isOnline) ? null : _sendMessage,
+                          (_isLoading || !isOnline) ? null : _sendMessage,
                     ),
                   ),
                 ],

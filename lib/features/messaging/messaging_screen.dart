@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../theme/colors.dart';
+import '../../widgets/connectivity_wrapper.dart';
 import '../../theme/typography.dart';
 import '../../mock/mock_data.dart';
 
@@ -17,7 +18,8 @@ class MessagingScreen extends StatefulWidget {
   State<MessagingScreen> createState() => _MessagingScreenState();
 }
 
-class _MessagingScreenState extends State<MessagingScreen> {
+class _MessagingScreenState extends State<MessagingScreen>
+    with ConnectivityAware {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   List<Message> _messages = [];
@@ -38,7 +40,7 @@ class _MessagingScreenState extends State<MessagingScreen> {
   @override
   Widget build(BuildContext context) {
     final host = MockData.getHostById(widget.hostId);
-    
+
     if (host == null) {
       return Scaffold(
         appBar: AppBar(
@@ -55,11 +57,14 @@ class _MessagingScreenState extends State<MessagingScreen> {
       appBar: _buildAppBar(host),
       body: Column(
         children: [
+          // Offline banner
+          buildOfflineBanner(),
+
           // Messages list
           Expanded(
             child: _buildMessagesList(),
           ),
-          
+
           // Input bar
           _buildInputBar(),
         ],
@@ -91,9 +96,9 @@ class _MessagingScreenState extends State<MessagingScreen> {
               color: AppColors.oliveGold.withValues(alpha: 0.7),
             ),
           ),
-          
+
           const SizedBox(width: 12),
-          
+
           // Host info
           Expanded(
             child: Column(
@@ -158,8 +163,8 @@ class _MessagingScreenState extends State<MessagingScreen> {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: Row(
-        mainAxisAlignment: message.isSentByUser 
-            ? MainAxisAlignment.end 
+        mainAxisAlignment: message.isSentByUser
+            ? MainAxisAlignment.end
             : MainAxisAlignment.start,
         children: [
           if (!message.isSentByUser) ...[
@@ -179,7 +184,7 @@ class _MessagingScreenState extends State<MessagingScreen> {
             ),
             const SizedBox(width: 8),
           ],
-          
+
           // Message bubble
           Flexible(
             child: Container(
@@ -188,8 +193,8 @@ class _MessagingScreenState extends State<MessagingScreen> {
               ),
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               decoration: BoxDecoration(
-                color: message.isSentByUser 
-                    ? AppColors.earthBrown 
+                color: message.isSentByUser
+                    ? AppColors.earthBrown
                     : AppColors.white,
                 borderRadius: BorderRadius.only(
                   topLeft: const Radius.circular(18),
@@ -211,8 +216,8 @@ class _MessagingScreenState extends State<MessagingScreen> {
                   Text(
                     message.text,
                     style: AppTypography.bodyMedium.copyWith(
-                      color: message.isSentByUser 
-                          ? AppColors.white 
+                      color: message.isSentByUser
+                          ? AppColors.white
                           : AppColors.textPrimary,
                       height: 1.4,
                     ),
@@ -221,7 +226,7 @@ class _MessagingScreenState extends State<MessagingScreen> {
                   Text(
                     message.timestamp,
                     style: AppTypography.bodySmall.copyWith(
-                      color: message.isSentByUser 
+                      color: message.isSentByUser
                           ? AppColors.white.withValues(alpha: 0.8)
                           : AppColors.textSecondary,
                       fontSize: 11,
@@ -231,7 +236,7 @@ class _MessagingScreenState extends State<MessagingScreen> {
               ),
             ),
           ),
-          
+
           if (message.isSentByUser) ...[
             const SizedBox(width: 8),
             // User avatar placeholder for sent messages
@@ -279,9 +284,9 @@ class _MessagingScreenState extends State<MessagingScreen> {
               ),
               tooltip: 'Attach file',
             ),
-            
+
             const SizedBox(width: 8),
-            
+
             // Text input
             Expanded(
               child: Container(
@@ -313,9 +318,9 @@ class _MessagingScreenState extends State<MessagingScreen> {
                 ),
               ),
             ),
-            
+
             const SizedBox(width: 8),
-            
+
             // Send button
             Container(
               decoration: BoxDecoration(
@@ -342,6 +347,11 @@ class _MessagingScreenState extends State<MessagingScreen> {
     final text = _messageController.text.trim();
     if (text.isEmpty) return;
 
+    if (!isOnline) {
+      showOfflineSnackbar('Sending messages requires an internet connection.');
+      return;
+    }
+
     setState(() {
       _messages.add(
         Message(
@@ -354,7 +364,7 @@ class _MessagingScreenState extends State<MessagingScreen> {
     });
 
     _messageController.clear();
-    
+
     // Auto-scroll to bottom
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scrollController.hasClients) {
@@ -369,7 +379,8 @@ class _MessagingScreenState extends State<MessagingScreen> {
 
   String _getCurrentTime() {
     final now = DateTime.now();
-    final hour = now.hour > 12 ? now.hour - 12 : (now.hour == 0 ? 12 : now.hour);
+    final hour =
+        now.hour > 12 ? now.hour - 12 : (now.hour == 0 ? 12 : now.hour);
     final minute = now.minute.toString().padLeft(2, '0');
     final period = now.hour >= 12 ? 'PM' : 'AM';
     return '$hour:$minute $period';

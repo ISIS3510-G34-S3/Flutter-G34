@@ -5,6 +5,7 @@ import '../../theme/colors.dart';
 import '../../theme/typography.dart';
 import '../../models/host.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import '../../widgets/connectivity_wrapper.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -25,7 +26,7 @@ class ProfileScreen extends StatefulWidget {
   State<ProfileScreen> createState() => _ProfileScreenState();
 }
 
-class _ProfileScreenState extends State<ProfileScreen> {
+class _ProfileScreenState extends State<ProfileScreen> with ConnectivityAware {
   final HostService _hostService = HostService();
   final ProfilePictureService _profilePictureService = ProfilePictureService();
   bool _isUploadingPhoto = false;
@@ -340,6 +341,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           return ListView(
             padding: const EdgeInsets.all(16),
             children: [
+              buildOfflineBanner(),
               _buildProfileHeader(user),
               const SizedBox(height: 16),
               if (!user.isVerified) _buildVerificationBanner(context),
