@@ -50,4 +50,31 @@ class BookingService {
         .map((snapshot) =>
             snapshot.docs.map((doc) => Booking.fromFirestore(doc)).toList());
   }
+
+  Stream<List<Booking>> getBookingsByTraveler() {
+    final user = _auth.currentUser;
+    if (user == null) {
+      return const Stream.empty();
+    }
+
+    final travelerId = user.email ?? user.uid;
+    final travelerRef = '/users/$travelerId';
+
+    return _firestore
+        .collectionGroup('bookings')
+        .where('travelerID', isEqualTo: travelerRef)
+        .orderBy('startsAt', descending: true)
+        .snapshots()
+        .map((snapshot) =>
+            snapshot.docs.map((doc) => Booking.fromFirestore(doc)).toList());
+  }
+
+  Future<void> deleteBooking(String experienceId, String bookingId) async {
+    await _firestore
+        .collection('experiences')
+        .doc(experienceId)
+        .collection('bookings')
+        .doc(bookingId)
+        .delete();
+  }
 }
