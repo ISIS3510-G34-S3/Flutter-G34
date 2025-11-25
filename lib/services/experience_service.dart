@@ -453,6 +453,16 @@ class ExperienceService {
             .toList());
   }
 
+  /// Stream all experiences
+  Stream<List<models.Experience>> watchExperiences() {
+    return _firestore
+        .collection('experiences')
+        .snapshots()
+        .map((snapshot) => snapshot.docs
+            .map((doc) => models.Experience.fromFirestore(doc))
+            .toList());
+  }
+
   Future<void> _ensureHostMetadata(
       String hostDocId, DocumentReference hostRef) async {
     if (!await hasConnectivity()) return;
@@ -831,8 +841,10 @@ class ExperienceService {
             }
           }
 
-          // Remove from pending queue after successful sync
-          await _pendingOps.removePendingOperation(operation.id);
+          // Remove from pending queue after successful sync ONLY if handled
+          if (['create', 'update', 'delete'].contains(operation.type)) {
+            await _pendingOps.removePendingOperation(operation.id);
+          }
         } catch (e) {
           print('❌ Failed to sync operation ${operation.id}: $e');
           // Continue with next operation

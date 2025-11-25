@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:travel_connect/models/experience.dart';
+import 'package:travel_connect/models/booking.dart';
 import '../../widgets/connectivity_wrapper.dart';
 import 'package:travel_connect/services/experience_service.dart';
+import 'package:travel_connect/services/booking_service.dart';
 import '../../theme/colors.dart';
 import '../../theme/typography.dart';
 import '../../widgets/currency_price.dart';
@@ -22,8 +24,10 @@ class BookingScreen extends StatefulWidget {
 
 class _BookingScreenState extends State<BookingScreen> with ConnectivityAware {
   final ExperienceService _experienceService = ExperienceService();
+  final BookingService _bookingService = BookingService();
   Experience? _experience;
   bool _isLoading = true;
+  bool _isBooking = false;
 
   DateTime? selectedDate;
   DateTime currentMonth = DateTime.now();
@@ -55,6 +59,97 @@ class _BookingScreenState extends State<BookingScreen> with ConnectivityAware {
         });
       }
       // Optionally, show an error message
+    }
+  }
+
+  Future<void> _createBooking() async {
+    if (selectedDate == null || _experience == null) return;
+
+    setState(() {
+      _isBooking = true;
+    });
+
+    try {
+      // Parse selected time
+      final timeParts = selectedTime.split(' ');
+      final time = timeParts[0].split(':');
+      int hour = int.parse(time[0]);
+      final minute = int.parse(time[1]);
+      final isPm = timeParts[1] == 'PM';
+
+      if (isPm && hour != 12) hour += 12;
+      if (!isPm && hour == 12) hour = 0;
+
+      final startsAt = DateTime(
+        selectedDate!.year,
+        selectedDate!.month,
+        selectedDate!.day,
+        hour,
+        minute,
+      );
+
+      // Calculate endsAt based on duration (assuming duration is in days for now, or hours?)
+      // The model says duration is int. The UI says "3 days".
+      // Let's assume duration is days as per UI text.
+      // However, for a booking, usually it's a start time.
+      // If it's a multi-day experience, endsAt should be startsAt + duration days.
+      final endsAt = startsAt.add(Duration(days: _experience!.duration));
+
+      final totalAmount = _experience!.priceCOP * guests;
+
+      // Create booking
+      final booking = Booking(
+        id: '', // Firestore will generate ID
+        experienceId: widget.experienceId,
+        travelerId: '', // Service handles this
+        amountCOP: totalAmount,
+        peopleCount: guests,
+        startsAt: startsAt,
+        endsAt: endsAt,
+        status: 'active',
+        createdAt: DateTime.now(),
+      );
+
+      final isOnline = await _bookingService.createBookingOfflineCapable(booking);
+
+      if (mounted) {
+        context.pop(); // Close loading dialog
+        
+        if (isOnline) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Booking confirmed for ${_formatSelectedDate()}!'),
+              backgroundColor: AppColors.forestGreen,
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('No internet. Your booking will be uploaded when you get connection.'),
+              backgroundColor: AppColors.oliveGold,
+              duration: Duration(seconds: 4),
+            ),
+          );
+        }
+        
+        context.pop(); // Go back to previous screen
+      }
+    } catch (e) {
+      if (mounted) {
+        context.pop(); // Close loading dialog
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error creating booking: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isBooking = false;
+        });
+      }
     }
   }
 
@@ -489,33 +584,30 @@ class _BookingScreenState extends State<BookingScreen> with ConnectivityAware {
         child: SizedBox(
           width: double.infinity,
           child: ElevatedButton(
-            onPressed: selectedDate != null
+            onPressed: selectedDate != null && !_isBooking
                 ? () {
-                    if (!isOnline) {
-                      showOfflineSnackbar(
-                          'Booking requires an internet connection.');
-                      return;
-                    }
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                            'Booking confirmed for ${_formatSelectedDate()}!'),
-                        backgroundColor: AppColors.forestGreen,
-                      ),
-                    );
-                    context.pop();
+                    _createBooking();
                   }
                 : null,
             style: ElevatedButton.styleFrom(
               padding: const EdgeInsets.symmetric(vertical: 16),
               backgroundColor: AppColors.forestGreen,
             ),
-            child: Text(
-              'Confirm Booking • \$${total.toStringAsFixed(2)} COP',
-              style: AppTypography.buttonLarge.copyWith(
-                color: AppColors.white,
-              ),
-            ),
+            child: _isBooking
+                ? const SizedBox(
+                    height: 20,
+                    width: 20,
+                    child: CircularProgressIndicator(
+                      color: AppColors.white,
+                      strokeWidth: 2,
+                    ),
+                  )
+                : Text(
+                    'Confirm Booking • \$${total.toStringAsFixed(2)} COP',
+                    style: AppTypography.buttonLarge.copyWith(
+                      color: AppColors.white,
+                    ),
+                  ),
           ),
         ),
       ),

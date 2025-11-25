@@ -15,6 +15,7 @@ import '../features/profile/currency_settings_screen.dart';
 import '../features/messaging/messaging_screen.dart';
 import '../features/chatbot/chatbot_screen.dart';
 import '../widgets/main_scaffold.dart';
+import '../features/experience/my_bookings_screen.dart';
 import '../features/experience/my_experiences_screen.dart';
 import '../features/experience/edit_experience_screen.dart';
 import '../features/profile/host_screen.dart';
@@ -81,6 +82,13 @@ final GoRouter appRouter = GoRouter(
           path: '/map',
           name: 'map',
           builder: (context, state) => const MapScreen(),
+        ),
+
+        // My Bookings route
+        GoRoute(
+          path: '/my-bookings',
+          name: 'my-bookings',
+          builder: (context, state) => const MyBookingsScreen(),
         ),
 
         // Create experience route
