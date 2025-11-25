@@ -28,7 +28,9 @@ class Booking {
     return Booking(
       id: doc.id,
       experienceId: data['experienceId'] ?? '',
-      travelerId: data['travelerID'] ?? '', // Note: Firestore field is travelerID
+      travelerId: data['travelerID'] is DocumentReference
+          ? (data['travelerID'] as DocumentReference).path
+          : data['travelerID'] ?? '', // Note: Firestore field is travelerID
       amountCOP: data['amountCOP'] ?? 0,
       peopleCount: data['peopleCount'] ?? 1,
       startsAt: (data['startsAt'] as Timestamp).toDate(),

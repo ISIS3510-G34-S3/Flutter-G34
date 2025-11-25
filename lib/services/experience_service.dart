@@ -841,8 +841,10 @@ class ExperienceService {
             }
           }
 
-          // Remove from pending queue after successful sync
-          await _pendingOps.removePendingOperation(operation.id);
+          // Remove from pending queue after successful sync ONLY if handled
+          if (['create', 'update', 'delete'].contains(operation.type)) {
+            await _pendingOps.removePendingOperation(operation.id);
+          }
         } catch (e) {
           print('❌ Failed to sync operation ${operation.id}: $e');
           // Continue with next operation

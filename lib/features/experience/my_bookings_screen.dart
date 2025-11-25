@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:travel_connect/models/booking.dart';
@@ -214,16 +215,20 @@ class _BookingCardState extends State<BookingCard> {
                       color: Colors.grey[200],
                       child: const Center(child: CircularProgressIndicator()),
                     )
-                  else if (_experience != null && _experience!.images.isNotEmpty)
-                    Image.network(
-                      _experience!.images.first,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => Container(
-                        color: Colors.grey[200],
-                        child: const Icon(Icons.broken_image,
-                            size: 40, color: Colors.grey),
-                      ),
-                    )
+                    else if (_experience != null && _experience!.images.isNotEmpty)
+                      CachedNetworkImage(
+                        imageUrl: _experience!.images.first,
+                        fit: BoxFit.cover,
+                        placeholder: (context, url) => Container(
+                          color: Colors.grey[200],
+                          child: const Center(child: CircularProgressIndicator()),
+                        ),
+                        errorWidget: (context, url, error) => Container(
+                          color: Colors.grey[200],
+                          child: const Icon(Icons.broken_image,
+                              size: 40, color: Colors.grey),
+                        ),
+                      )
                   else
                     Container(
                       color: AppColors.forestGreen.withOpacity(0.1),

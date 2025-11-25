@@ -1284,7 +1284,7 @@ class _CreateExperienceScreenState extends State<CreateExperienceScreen>
       // Show appropriate success message
       final message = experienceId != null
           ? 'Experience created successfully!'
-          : 'Experience saved offline. Will sync when online.';
+          : 'No internet. Your experience will be uploaded when you get connection.';
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(

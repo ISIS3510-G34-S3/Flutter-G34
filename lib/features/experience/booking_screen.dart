@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:travel_connect/models/experience.dart';
+import 'package:travel_connect/models/booking.dart';
 import '../../widgets/connectivity_wrapper.dart';
 import 'package:travel_connect/services/experience_service.dart';
 import 'package:travel_connect/services/booking_service.dart';
@@ -96,28 +97,49 @@ class _BookingScreenState extends State<BookingScreen> with ConnectivityAware {
 
       final totalAmount = _experience!.priceCOP * guests;
 
-      await _bookingService.createBooking(
+      // Create booking
+      final booking = Booking(
+        id: '', // Firestore will generate ID
         experienceId: widget.experienceId,
+        travelerId: '', // Service handles this
+        amountCOP: totalAmount,
+        peopleCount: guests,
         startsAt: startsAt,
         endsAt: endsAt,
-        peopleCount: guests,
-        amountCOP: totalAmount,
+        status: 'active',
+        createdAt: DateTime.now(),
       );
 
+      final isOnline = await _bookingService.createBookingOfflineCapable(booking);
+
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Booking confirmed for ${_formatSelectedDate()}!'),
-            backgroundColor: AppColors.forestGreen,
-          ),
-        );
-        context.pop();
+        context.pop(); // Close loading dialog
+        
+        if (isOnline) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Booking confirmed for ${_formatSelectedDate()}!'),
+              backgroundColor: AppColors.forestGreen,
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('No internet. Your booking will be uploaded when you get connection.'),
+              backgroundColor: AppColors.oliveGold,
+              duration: Duration(seconds: 4),
+            ),
+          );
+        }
+        
+        context.pop(); // Go back to previous screen
       }
     } catch (e) {
       if (mounted) {
+        context.pop(); // Close loading dialog
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to create booking: $e'),
+            content: Text('Error creating booking: $e'),
             backgroundColor: Colors.red,
           ),
         );
@@ -564,11 +586,6 @@ class _BookingScreenState extends State<BookingScreen> with ConnectivityAware {
           child: ElevatedButton(
             onPressed: selectedDate != null && !_isBooking
                 ? () {
-                    if (!isOnline) {
-                      showOfflineSnackbar(
-                          'Booking requires an internet connection.');
-                      return;
-                    }
                     _createBooking();
                   }
                 : null,
