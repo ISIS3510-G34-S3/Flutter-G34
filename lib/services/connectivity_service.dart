@@ -19,9 +19,9 @@ class ConnectivityService {
   DateTime? _lastSuccessfulCheck;
 
   // Configuration constants
-  static const Duration _checkTimeout = Duration(seconds: 5);
+  static const Duration _checkTimeout = Duration(seconds: 2);
   static const Duration _periodicCheckInterval = Duration(seconds: 30);
-  static const int _maxRetries = 2;
+  static const int _maxRetries = 1;
   static const List<String> _testUrls = [
     'https://www.google.com',
     'https://www.cloudflare.com',
@@ -36,9 +36,9 @@ class ConnectivityService {
 
   /// Comprehensive connectivity check using HTTP reachability test
   /// This works in airplane mode with WiFi, unlike connectivity_plus alone
-  Future<bool> checkConnectivity() async {
+  Future<bool> checkConnectivity({bool isInitialCheck = false}) async {
     debugPrint(
-        '🔍 [ConnectivityService] Starting comprehensive connectivity check...');
+        '🔍 [ConnectivityService] Starting ${isInitialCheck ? "optimistic initial" : "comprehensive"} connectivity check...');
 
     // Step 1: Check device connectivity state (WiFi/Mobile/None)
     try {
@@ -61,7 +61,8 @@ class ConnectivityService {
     }
 
     // Step 2: Perform actual HTTP reachability test with retry logic
-    _isOnline = await _performHttpReachabilityTest();
+    _isOnline =
+        await _performHttpReachabilityTest(quickCheckOnly: isInitialCheck);
 
     if (_isOnline) {
       _lastSuccessfulCheck = DateTime.now();
@@ -74,7 +75,8 @@ class ConnectivityService {
   }
 
   /// Perform HTTP reachability test with exponential backoff retry
-  Future<bool> _performHttpReachabilityTest() async {
+  Future<bool> _performHttpReachabilityTest(
+      {bool quickCheckOnly = false}) async {
     // Quick first attempt - try just one fast URL
     try {
       final quickCheck = await _testSingleUrl(_testUrls[0]);
@@ -84,7 +86,8 @@ class ConnectivityService {
       }
     } catch (e) {
       debugPrint(
-          '⚠️ [ConnectivityService] Quick check failed, trying all URLs...');
+          '⚠️ [ConnectivityService] Quick check failed${quickCheckOnly ? ', assuming online' : ', trying all URLs...'}');
+      if (quickCheckOnly) return true; // Be optimistic on first load
     }
 
     // If quick check failed, try all URLs with retry
@@ -157,8 +160,8 @@ class ConnectivityService {
   void startMonitoring(Function(bool isOnline) onConnectivityChanged) {
     stopMonitoring(); // Clean up any existing monitoring
 
-    // Initial check
-    checkConnectivity().then((isOnline) {
+    // Initial check (optimistic)
+    checkConnectivity(isInitialCheck: true).then((isOnline) {
       onConnectivityChanged(isOnline);
     });
 

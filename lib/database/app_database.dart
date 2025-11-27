@@ -179,6 +179,47 @@ class AppDatabase extends _$AppDatabase {
     );
   }
 
+  /// Update specific user fields (partial update)
+  Future<void> updateUserFields(
+    String id, {
+    String? name,
+    String? about,
+    String? languages,
+    String? photoURL,
+    bool? isDirty,
+  }) async {
+    final companion = UsersCompanion(
+      id: Value(id),
+      name: name != null ? Value(name) : const Value.absent(),
+      about: about != null ? Value(about) : const Value.absent(),
+      languages: languages != null ? Value(languages) : const Value.absent(),
+      photoURL: photoURL != null ? Value(photoURL) : const Value.absent(),
+      isDirty: isDirty != null ? Value(isDirty) : const Value.absent(),
+      lastSyncedAt: Value(DateTime.now()),
+    );
+
+    await (update(users)..where((u) => u.id.equals(id))).write(companion);
+  }
+
+  /// Get count of experiences hosted by a user
+  Future<int> getHostedExperiencesCount(String userId) async {
+    final result = await (selectOnly(experiences)
+          ..addColumns([experiences.id.count()])
+          ..where(experiences.hostId.equals(userId)))
+        .getSingle();
+    return result.read(experiences.id.count()) ?? 0;
+  }
+
+  /// Get count of experiences joined by a user
+  /// Note: This requires a bookings table which may not exist yet
+  /// For now, returns 0 - should be implemented when bookings table is added
+  Future<int> getJoinedExperiencesCount(String userId) async {
+    // TODO: Implement when bookings table is available
+    // For now, return the value from the users table if available
+    final user = await getUserById(userId);
+    return user?.joinedExperiences ?? 0;
+  }
+
   // ============================================
   // UTILITY OPERATIONS
   // ============================================

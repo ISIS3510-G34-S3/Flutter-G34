@@ -34,7 +34,9 @@ class _HostScreenState extends State<HostScreen> with ConnectivityAware {
 
   Future<void> _fetchHost() async {
     try {
-      final host = await _hostService.getHostById(widget.hostId);
+      // Force refresh from server to get latest profile picture and data
+      final host =
+          await _hostService.getHostById(widget.hostId, forceRefresh: true);
       if (mounted) {
         setState(() {
           _host = host;
@@ -126,21 +128,43 @@ class _HostScreenState extends State<HostScreen> with ConnectivityAware {
           children: [
             Hero(
               tag: 'host-avatar-${host.id}',
-              child: CircleAvatar(
-                radius: 40,
-                backgroundColor: AppColors.peach.withOpacity(0.3),
-                backgroundImage:
-                    host.photoURL != null && host.photoURL!.isNotEmpty
-                        ? CachedNetworkImageProvider(host.photoURL!)
-                        : null,
-                child: host.photoURL == null || host.photoURL!.isEmpty
-                    ? Text(
+              child: host.photoURL != null && host.photoURL!.isNotEmpty
+                  ? CachedNetworkImage(
+                      imageUrl: host.photoURL!,
+                      imageBuilder: (context, imageProvider) => CircleAvatar(
+                        radius: 40,
+                        backgroundImage: imageProvider,
+                        backgroundColor: AppColors.peach.withOpacity(0.3),
+                      ),
+                      placeholder: (context, url) => CircleAvatar(
+                        radius: 40,
+                        backgroundColor: AppColors.peach.withOpacity(0.3),
+                        child: const CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: AppColors.forestGreen,
+                        ),
+                      ),
+                      errorWidget: (context, url, error) => CircleAvatar(
+                        radius: 40,
+                        backgroundColor: AppColors.peach.withOpacity(0.3),
+                        child: Text(
+                          host.name.isNotEmpty
+                              ? host.name[0].toUpperCase()
+                              : '?',
+                          style: AppTypography.displaySmall
+                              .copyWith(color: AppColors.oliveGold),
+                        ),
+                      ),
+                    )
+                  : CircleAvatar(
+                      radius: 40,
+                      backgroundColor: AppColors.peach.withOpacity(0.3),
+                      child: Text(
                         host.name.isNotEmpty ? host.name[0].toUpperCase() : '?',
                         style: AppTypography.displaySmall
                             .copyWith(color: AppColors.oliveGold),
-                      )
-                    : null,
-              ),
+                      ),
+                    ),
             ),
             const SizedBox(width: 20),
             Expanded(
@@ -246,7 +270,17 @@ class _HostScreenState extends State<HostScreen> with ConnectivityAware {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Languages', style: AppTypography.titleSmall),
+            Row(
+              children: [
+                const Icon(
+                  Icons.language,
+                  size: 20,
+                  color: AppColors.forestGreen,
+                ),
+                const SizedBox(width: 8),
+                Text('Languages', style: AppTypography.titleSmall),
+              ],
+            ),
             const SizedBox(height: 12),
             Wrap(
               spacing: 8,
@@ -254,7 +288,20 @@ class _HostScreenState extends State<HostScreen> with ConnectivityAware {
               children: host.languages
                   .map((lang) => Chip(
                         label: Text(lang),
-                        backgroundColor: AppColors.peach.withOpacity(0.3),
+                        backgroundColor:
+                            AppColors.forestGreen.withValues(alpha: 0.1),
+                        labelStyle: AppTypography.bodyMedium.copyWith(
+                          color: AppColors.forestGreen,
+                          fontWeight: FontWeight.w500,
+                        ),
+                        side: BorderSide(
+                          color: AppColors.forestGreen.withValues(alpha: 0.3),
+                          width: 1,
+                        ),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
                       ))
                   .toList(),
             ),

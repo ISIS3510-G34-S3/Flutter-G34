@@ -11,6 +11,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:drift/drift.dart' as drift;
 import '../../services/profile_picture_service.dart';
+import '../../services/profile_service.dart';
 import '../../database/app_database.dart';
 
 /// Profile screen showing user information and verification status
@@ -29,7 +30,22 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> with ConnectivityAware {
   final HostService _hostService = HostService();
   final ProfilePictureService _profilePictureService = ProfilePictureService();
+  final ProfileService _profileService = ProfileService();
   bool _isUploadingPhoto = false;
+  int _refreshKey = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    // Start monitoring connectivity for profile updates
+    _profileService.startConnectivityMonitoring();
+  }
+
+  @override
+  void dispose() {
+    _profileService.dispose();
+    super.dispose();
+  }
 
   /// Show dialog to choose photo source
   Future<void> _showPhotoUploadDialog(Host user) async {
@@ -166,10 +182,16 @@ class _ProfileScreenState extends State<ProfileScreen> with ConnectivityAware {
           ),
         );
 
-        // Refresh the profile to show new picture
+        // Force refresh the profile to show new picture from server
         setState(() {
           _isUploadingPhoto = false;
+          _refreshKey++; // Force FutureBuilder to reload
         });
+
+        // Clear old image from cache
+        if (user.photoURL != null && user.photoURL!.startsWith('http')) {
+          await CachedNetworkImage.evictFromCache(user.photoURL!);
+        }
       } else {
         if (!mounted) return;
         setState(() {
@@ -306,16 +328,10 @@ class _ProfileScreenState extends State<ProfileScreen> with ConnectivityAware {
         backgroundColor: AppColors.forestGreen,
         elevation: 0,
         automaticallyImplyLeading: false,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.edit, color: AppColors.white),
-            onPressed: () => _editProfile(context),
-            tooltip: 'Edit Profile',
-          ),
-        ],
       ),
       body: FutureBuilder<Host?>(
-        future: _hostService.getCurrentUserHost(),
+        key: ValueKey(_refreshKey),
+        future: _hostService.getCurrentUserHost(forceRefresh: true),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
@@ -338,24 +354,42 @@ class _ProfileScreenState extends State<ProfileScreen> with ConnectivityAware {
             );
           }
 
-          return ListView(
-            padding: const EdgeInsets.all(16),
+          return Column(
             children: [
-              buildOfflineBanner(),
-              _buildProfileHeader(user),
-              const SizedBox(height: 16),
-              if (!user.isVerified) _buildVerificationBanner(context),
-              const SizedBox(height: 16),
-              _buildAboutSection(user),
-              const SizedBox(height: 16),
-              _buildLanguagesSection(user),
-              const SizedBox(height: 16),
-              _buildExperiencesSection(user),
-              const SizedBox(height: 16),
-              _buildAchievementsSection(),
-              const SizedBox(height: 16),
-              _buildSettingsSection(context),
-              const SizedBox(height: 32),
+              // Edit profile button in app bar
+              Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: Align(
+                  alignment: Alignment.topRight,
+                  child: IconButton(
+                    icon: const Icon(Icons.edit, color: AppColors.forestGreen),
+                    onPressed: () => _editProfile(context, user),
+                    tooltip: 'Edit Profile',
+                  ),
+                ),
+              ),
+              Expanded(
+                child: ListView(
+                  padding: const EdgeInsets.all(16),
+                  children: [
+                    buildOfflineBanner(),
+                    _buildProfileHeader(user),
+                    const SizedBox(height: 16),
+                    if (!user.isVerified) _buildVerificationBanner(context),
+                    const SizedBox(height: 16),
+                    _buildAboutSection(user),
+                    const SizedBox(height: 16),
+                    _buildLanguagesSection(user),
+                    const SizedBox(height: 16),
+                    _buildExperiencesSection(user),
+                    const SizedBox(height: 16),
+                    _buildAchievementsSection(),
+                    const SizedBox(height: 16),
+                    _buildSettingsSection(context),
+                    const SizedBox(height: 32),
+                  ],
+                ),
+              ),
             ],
           );
         },
@@ -632,28 +666,38 @@ class _ProfileScreenState extends State<ProfileScreen> with ConnectivityAware {
               ],
             ),
             const SizedBox(height: 12),
-            ...user.languages.map((language) => Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 6,
-                        height: 6,
-                        decoration: const BoxDecoration(
-                          color: AppColors.forestGreen,
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Text(
-                        language,
-                        style: AppTypography.bodyMedium.copyWith(
-                          color: AppColors.textPrimary,
-                        ),
-                      ),
-                    ],
-                  ),
-                )),
+            if (user.languages.isEmpty)
+              Text(
+                'No languages added yet',
+                style: AppTypography.bodyMedium.copyWith(
+                  color: AppColors.textSecondary,
+                  fontStyle: FontStyle.italic,
+                ),
+              )
+            else
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: user.languages.map((language) {
+                  return Chip(
+                    label: Text(language),
+                    backgroundColor:
+                        AppColors.forestGreen.withValues(alpha: 0.1),
+                    labelStyle: AppTypography.bodyMedium.copyWith(
+                      color: AppColors.forestGreen,
+                      fontWeight: FontWeight.w500,
+                    ),
+                    side: BorderSide(
+                      color: AppColors.forestGreen.withValues(alpha: 0.3),
+                      width: 1,
+                    ),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
+                  );
+                }).toList(),
+              ),
           ],
         ),
       ),
@@ -671,40 +715,64 @@ class _ProfileScreenState extends State<ProfileScreen> with ConnectivityAware {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'My Experiences',
-              style: AppTypography.titleSmall.copyWith(
-                color: AppColors.textPrimary,
-              ),
-            ),
-            const SizedBox(height: 16),
             Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                // Hosted experiences
-                Expanded(
-                  child: _buildExperienceCounter(
-                    count: user.hostedExperiences,
-                    label: 'Hosted',
-                    color: AppColors.forestGreen,
+                Text(
+                  'My Experiences',
+                  style: AppTypography.titleSmall.copyWith(
+                    color: AppColors.textPrimary,
                   ),
                 ),
-
-                Container(
-                  height: 40,
-                  width: 1,
-                  color: AppColors.divider,
-                  margin: const EdgeInsets.symmetric(horizontal: 16),
-                ),
-
-                // Joined experiences
-                Expanded(
-                  child: _buildExperienceCounter(
-                    count: user.joinedExperiences,
-                    label: 'Joined',
-                    color: AppColors.lava,
+                TextButton.icon(
+                  onPressed: () => context.push('/my-experiences'),
+                  icon: const Icon(Icons.arrow_forward, size: 18),
+                  label: const Text('View All'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: AppColors.forestGreen,
                   ),
                 ),
               ],
+            ),
+            const SizedBox(height: 16),
+            FutureBuilder<Map<String, int>>(
+              future: _profileService.getExperienceCounts(user.id),
+              builder: (context, snapshot) {
+                // Use data from snapshot if available, otherwise fall back to user values
+                final hostedCount =
+                    snapshot.data?['hosted'] ?? user.hostedExperiences;
+                final joinedCount =
+                    snapshot.data?['joined'] ?? user.joinedExperiences;
+
+                return Row(
+                  children: [
+                    // Hosted experiences
+                    Expanded(
+                      child: _buildExperienceCounter(
+                        count: hostedCount,
+                        label: 'Hosted',
+                        color: AppColors.forestGreen,
+                      ),
+                    ),
+
+                    Container(
+                      height: 40,
+                      width: 1,
+                      color: AppColors.divider,
+                      margin: const EdgeInsets.symmetric(horizontal: 16),
+                    ),
+
+                    // Joined experiences
+                    Expanded(
+                      child: _buildExperienceCounter(
+                        count: joinedCount,
+                        label: 'Joined',
+                        color: AppColors.lava,
+                      ),
+                    ),
+                  ],
+                );
+              },
             ),
           ],
         ),
@@ -959,35 +1027,70 @@ class _ProfileScreenState extends State<ProfileScreen> with ConnectivityAware {
     );
   }
 
-  void _editProfile(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(
-          'Edit Profile',
-          style: AppTypography.titleMedium.copyWith(
-            color: AppColors.textPrimary,
-          ),
+  void _editProfile(BuildContext context, Host user) async {
+    final nameController = TextEditingController(text: user.name);
+    final aboutController = TextEditingController(text: user.about);
+    final selectedLanguages = List<String>.from(user.languages);
+    final availableLanguages = [
+      'English',
+      'Spanish',
+      'Portuguese',
+      'French',
+    ];
+
+    final result = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (context) => _EditProfileScreen(
+          nameController: nameController,
+          aboutController: aboutController,
+          selectedLanguages: selectedLanguages,
+          availableLanguages: availableLanguages,
         ),
-        content: Text(
-          'Profile editing coming soon! You\'ll be able to update your information, add photos, and manage your experience listings.',
-          style: AppTypography.bodyMedium.copyWith(
-            color: AppColors.textPrimary,
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: Text(
-              'OK',
-              style: AppTypography.buttonMedium.copyWith(
-                color: AppColors.forestGreen,
-              ),
-            ),
-          ),
-        ],
       ),
     );
+
+    if (result == true) {
+      // Save the profile updates
+      try {
+        final wasOnline = await _profileService.updateProfile(
+          name: nameController.text.trim(),
+          about: aboutController.text.trim(),
+          languages: selectedLanguages,
+        );
+
+        if (!mounted) return;
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              wasOnline
+                  ? 'Profile updated successfully!'
+                  : 'Profile saved offline. Will sync when online.',
+              style: AppTypography.bodyMedium.copyWith(color: AppColors.white),
+            ),
+            backgroundColor: AppColors.forestGreen,
+          ),
+        );
+
+        // Refresh the profile
+        setState(() {});
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Failed to update profile: $e',
+              style: AppTypography.bodyMedium.copyWith(color: AppColors.white),
+            ),
+            backgroundColor: AppColors.lava,
+          ),
+        );
+      }
+    }
+
+    nameController.dispose();
+    aboutController.dispose();
   }
 
   void _showComingSoonDialog(BuildContext context, String feature) {
@@ -1059,6 +1162,244 @@ class _ProfileScreenState extends State<ProfileScreen> with ConnectivityAware {
               style: AppTypography.buttonMedium.copyWith(
                 color: AppColors.lava,
               ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Full-screen edit profile dialog
+class _EditProfileScreen extends StatefulWidget {
+  final TextEditingController nameController;
+  final TextEditingController aboutController;
+  final List<String> selectedLanguages;
+  final List<String> availableLanguages;
+
+  const _EditProfileScreen({
+    required this.nameController,
+    required this.aboutController,
+    required this.selectedLanguages,
+    required this.availableLanguages,
+  });
+
+  @override
+  State<_EditProfileScreen> createState() => _EditProfileScreenState();
+}
+
+class _EditProfileScreenState extends State<_EditProfileScreen> {
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.white,
+      appBar: AppBar(
+        title: Text(
+          'Edit Profile',
+          style: AppTypography.titleMedium.copyWith(
+            color: AppColors.white,
+          ),
+        ),
+        backgroundColor: AppColors.forestGreen,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.close, color: AppColors.white),
+          onPressed: () => Navigator.of(context).pop(false),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: Text(
+              'Save',
+              style: AppTypography.buttonMedium.copyWith(
+                color: AppColors.white,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ],
+      ),
+      body: ListView(
+        padding: const EdgeInsets.all(20),
+        children: [
+          // Name field
+          Card(
+            elevation: 1,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.person, color: AppColors.forestGreen),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Name',
+                        style: AppTypography.labelLarge.copyWith(
+                          color: AppColors.textPrimary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: widget.nameController,
+                    decoration: InputDecoration(
+                      hintText: 'Enter your name',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      filled: true,
+                      fillColor: AppColors.background,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // About field
+          Card(
+            elevation: 1,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.info_outline,
+                          color: AppColors.forestGreen),
+                      const SizedBox(width: 8),
+                      Text(
+                        'About',
+                        style: AppTypography.labelLarge.copyWith(
+                          color: AppColors.textPrimary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: widget.aboutController,
+                    maxLines: 6,
+                    decoration: InputDecoration(
+                      hintText: 'Tell others about yourself...',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      filled: true,
+                      fillColor: AppColors.background,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // Languages section
+          Card(
+            elevation: 1,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.language, color: AppColors.forestGreen),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Languages',
+                        style: AppTypography.labelLarge.copyWith(
+                          color: AppColors.textPrimary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Language selection chips
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: widget.availableLanguages.map((lang) {
+                      final isSelected =
+                          widget.selectedLanguages.contains(lang);
+                      return FilterChip(
+                        label: Text(lang),
+                        selected: isSelected,
+                        onSelected: (bool selected) {
+                          setState(() {
+                            if (selected) {
+                              widget.selectedLanguages.add(lang);
+                            } else {
+                              widget.selectedLanguages.remove(lang);
+                            }
+                          });
+                        },
+                        backgroundColor: AppColors.background,
+                        selectedColor:
+                            AppColors.forestGreen.withValues(alpha: 0.2),
+                        checkmarkColor: AppColors.forestGreen,
+                        labelStyle: AppTypography.bodyMedium.copyWith(
+                          color: isSelected
+                              ? AppColors.forestGreen
+                              : AppColors.textPrimary,
+                          fontWeight:
+                              isSelected ? FontWeight.w600 : FontWeight.normal,
+                        ),
+                        side: BorderSide(
+                          color: isSelected
+                              ? AppColors.forestGreen
+                              : AppColors.divider,
+                          width: isSelected ? 1.5 : 1,
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 32),
+
+          // Help text
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppColors.forestGreen.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.info_outline,
+                    size: 20, color: AppColors.forestGreen),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Your changes will be saved locally and synced when online.',
+                    style: AppTypography.bodySmall.copyWith(
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ],

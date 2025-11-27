@@ -87,7 +87,7 @@ class HostService {
     return null;
   }
 
-  Future<Host?> getCurrentUserHost() async {
+  Future<Host?> getCurrentUserHost({bool forceRefresh = false}) async {
     final user = _auth.currentUser;
     if (user == null) {
       return null;
@@ -97,6 +97,6 @@ class HostService {
         ? (user.email ?? '').toLowerCase()
         : user.uid;
 
-    return getHostById(docId);
+    return getHostById(docId, forceRefresh: forceRefresh);
   }
 }
