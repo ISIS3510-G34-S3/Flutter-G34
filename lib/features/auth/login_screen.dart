@@ -360,6 +360,7 @@ class _LoginScreenState extends State<LoginScreen> with ConnectivityAware {
 
       if (user != null) {
         // Upsert user document in Firestore using email as ID
+        // Note: Don't overwrite photoURL - user may have uploaded custom profile picture
         final emailId = (user.email ?? '').toLowerCase();
         final docRef = FirebaseFirestore.instance
             .collection('users')
@@ -368,7 +369,6 @@ class _LoginScreenState extends State<LoginScreen> with ConnectivityAware {
           'uid': user.uid,
           'email': user.email,
           'displayName': user.displayName,
-          'photoURL': user.photoURL,
           'lastSignInAt': FieldValue.serverTimestamp(),
         }, SetOptions(merge: true));
 
@@ -471,11 +471,11 @@ class _LoginScreenState extends State<LoginScreen> with ConnectivityAware {
         }
 
         // User exists → update metadata and continue
+        // Note: Don't overwrite photoURL - user may have uploaded custom profile picture
         await docRef.update({
           'uid': user.uid,
           'email': user.email,
           'displayName': user.displayName,
-          'photoURL': user.photoURL,
           'provider': 'google',
           'lastSignInAt': FieldValue.serverTimestamp(),
         });

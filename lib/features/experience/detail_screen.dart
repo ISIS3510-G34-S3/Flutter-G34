@@ -392,23 +392,55 @@ class _ExperienceDetailScreenState extends State<ExperienceDetailScreen>
               // Host avatar
               Hero(
                 tag: 'host-avatar-${host.id}',
-                child: CircleAvatar(
-                  radius: 24,
-                  backgroundImage: photoURL != null && photoURL.isNotEmpty
-                      ? CachedNetworkImageProvider(photoURL)
-                      : null,
-                  backgroundColor: AppColors.forestGreen.withValues(alpha: 0.2),
-                  child: photoURL == null || photoURL.isEmpty
-                      ? Text(
+                child: photoURL != null && photoURL.isNotEmpty
+                    ? CachedNetworkImage(
+                        imageUrl: photoURL,
+                        imageBuilder: (context, imageProvider) => CircleAvatar(
+                          radius: 24,
+                          backgroundImage: imageProvider,
+                          backgroundColor:
+                              AppColors.forestGreen.withValues(alpha: 0.2),
+                        ),
+                        placeholder: (context, url) => CircleAvatar(
+                          radius: 24,
+                          backgroundColor:
+                              AppColors.forestGreen.withValues(alpha: 0.2),
+                          child: const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: AppColors.forestGreen,
+                            ),
+                          ),
+                        ),
+                        errorWidget: (context, url, error) => CircleAvatar(
+                          radius: 24,
+                          backgroundColor:
+                              AppColors.forestGreen.withValues(alpha: 0.2),
+                          child: Text(
+                            displayName.isNotEmpty
+                                ? displayName[0].toUpperCase()
+                                : '?',
+                            style: AppTypography.titleMedium.copyWith(
+                              color: AppColors.forestGreen,
+                            ),
+                          ),
+                        ),
+                      )
+                    : CircleAvatar(
+                        radius: 24,
+                        backgroundColor:
+                            AppColors.forestGreen.withValues(alpha: 0.2),
+                        child: Text(
                           displayName.isNotEmpty
                               ? displayName[0].toUpperCase()
                               : '?',
                           style: AppTypography.titleMedium.copyWith(
                             color: AppColors.forestGreen,
                           ),
-                        )
-                      : null,
-                ),
+                        ),
+                      ),
               ),
               const SizedBox(width: 12),
               Expanded(

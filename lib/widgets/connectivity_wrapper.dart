@@ -41,13 +41,22 @@ class _ConnectivityWrapperState extends State<ConnectivityWrapper> {
   }
 
   Future<void> _initializeConnectivity() async {
-    _isOnline = await _connectivityService.checkConnectivity();
+    // Start optimistically - don't block UI
+    setState(() {
+      _isOnline = true; // Assume online initially
+      _isChecking = false;
+    });
 
-    if (mounted) {
-      setState(() {
-        _isChecking = false;
-      });
-    }
+    // Check connectivity in background with optimistic initial check
+    _connectivityService
+        .checkConnectivity(isInitialCheck: true)
+        .then((isOnline) {
+      if (mounted) {
+        setState(() {
+          _isOnline = isOnline;
+        });
+      }
+    });
 
     // Start monitoring connectivity changes
     _connectivityService.startMonitoring((isOnline) {
@@ -211,8 +220,18 @@ mixin ConnectivityAware<T extends StatefulWidget> on State<T> {
   }
 
   Future<void> _initConnectivity() async {
-    isOnline = await connectivityService.checkConnectivity();
-    if (mounted) setState(() {});
+    // Start optimistically
+    isOnline = true;
+
+    // Check in background
+    connectivityService.checkConnectivity(isInitialCheck: true).then((online) {
+      if (mounted && online != isOnline) {
+        setState(() {
+          isOnline = online;
+        });
+        onConnectivityChanged(online);
+      }
+    });
 
     connectivityService.startMonitoring((online) {
       if (mounted) {
