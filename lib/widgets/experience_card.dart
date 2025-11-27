@@ -4,6 +4,7 @@ import '../theme/colors.dart';
 import '../theme/typography.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'currency_price.dart';
+import 'package:travel_connect/services/booking_service.dart';
 
 /// Experience card widget for displaying experience information in lists
 class ExperienceCard extends StatelessWidget {
@@ -49,12 +50,60 @@ class ExperienceCard extends StatelessWidget {
                   const SizedBox(height: 12),
 
                   // Price
-                  CurrencyPrice(
-                    priceInCOP: experience.priceCOP,
-                    style: AppTypography.titleMedium.copyWith(
-                      color: AppColors.forestGreen,
-                    ),
-                    compact: true,
+                  // Price and Bookings
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      CurrencyPrice(
+                        priceInCOP: experience.priceCOP,
+                        style: AppTypography.titleMedium.copyWith(
+                          color: AppColors.forestGreen,
+                        ),
+                        compact: true,
+                      ),
+                      StreamBuilder<int>(
+                        stream: BookingService()
+                            .getBookingsCountStream(experience.id),
+                        builder: (context, snapshot) {
+                          if (snapshot.hasData && snapshot.data! > 0) {
+                            return Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: AppColors.forestGreen.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: AppColors.forestGreen.withOpacity(0.3),
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(
+                                    Icons.trending_up,
+                                    color: AppColors.forestGreen,
+                                    size: 14,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    '${snapshot.data} reservation(s) last week',
+                                    style: AppTypography.bodySmall.copyWith(
+                                      color: AppColors.forestGreen,
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }
+                          return const SizedBox.shrink();
+                        },
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -125,35 +174,40 @@ class ExperienceCard extends StatelessWidget {
   }
 
   Widget _buildTitleSection() {
-    return Row(
+    return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Title
-        Expanded(
-          child: Text(
-            experience.title,
-            style: AppTypography.titleSmall,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ),
-
-        const SizedBox(width: 16),
-
-        // Rating
         Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Icon(
-              Icons.star,
-              color: AppColors.oliveGold,
-              size: 18,
-            ),
-            const SizedBox(width: 4),
-            Text(
-              experience.avgRating.toStringAsFixed(1),
-              style: AppTypography.bodyMedium.copyWith(
-                fontWeight: FontWeight.bold,
+            // Title
+            Expanded(
+              child: Text(
+                experience.title,
+                style: AppTypography.titleSmall,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
               ),
+            ),
+
+            const SizedBox(width: 16),
+
+            // Rating
+            Row(
+              children: [
+                const Icon(
+                  Icons.star,
+                  color: AppColors.oliveGold,
+                  size: 18,
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  experience.avgRating.toStringAsFixed(1),
+                  style: AppTypography.bodyMedium.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
             ),
           ],
         ),

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:travel_connect/models/host.dart';
 import 'package:flutter/material.dart';
@@ -10,6 +11,7 @@ import '../../theme/colors.dart';
 import '../../theme/typography.dart';
 import '../../widgets/currency_price.dart';
 import '../../widgets/connectivity_wrapper.dart';
+import 'package:travel_connect/services/booking_service.dart';
 
 /// Experience detail screen with comprehensive information
 class ExperienceDetailScreen extends StatefulWidget {
@@ -32,11 +34,19 @@ class _ExperienceDetailScreenState extends State<ExperienceDetailScreen>
   Host? _host;
   bool _isLoading = true;
   int _currentImageIndex = 0;
+  int _bookingsLastWeek = 0;
+  StreamSubscription<int>? _bookingCountSubscription;
 
   @override
   void initState() {
     super.initState();
     _fetchExperience();
+  }
+
+  @override
+  void dispose() {
+    _bookingCountSubscription?.cancel();
+    super.dispose();
   }
 
   Future<void> _fetchExperience() async {
@@ -52,6 +62,18 @@ class _ExperienceDetailScreenState extends State<ExperienceDetailScreen>
           debugPrint('Error fetching host data: $e');
         }
       }
+
+      _bookingCountSubscription = BookingService()
+          .getBookingsCountStream(widget.experienceId)
+          .listen((count) {
+        if (mounted) {
+          setState(() {
+            _bookingsLastWeek = count;
+          });
+        }
+      }, onError: (e) {
+        debugPrint('Error fetching booking count: $e');
+      });
 
       if (mounted) {
         setState(() {
@@ -106,6 +128,9 @@ class _ExperienceDetailScreenState extends State<ExperienceDetailScreen>
 
                 // Title and rating section
                 _buildTitleSection(_experience!),
+
+                // Booking stats
+                if (_bookingsLastWeek > 0) _buildBookingStatsSection(),
 
                 // Photo gallery section
                 if (_experience!.images.isNotEmpty)
@@ -944,6 +969,50 @@ class _ExperienceDetailScreenState extends State<ExperienceDetailScreen>
             ],
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildBookingStatsSection() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: AppColors.forestGreen.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppColors.forestGreen.withOpacity(0.3)),
+        ),
+        child: Row(
+          children: [
+            const Icon(
+              Icons.trending_up,
+              color: AppColors.forestGreen,
+              size: 24,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Popular Experience',
+                    style: AppTypography.labelLarge.copyWith(
+                      color: AppColors.forestGreen,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  Text(
+                    '$_bookingsLastWeek people booked this in the last week',
+                    style: AppTypography.bodySmall.copyWith(
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
