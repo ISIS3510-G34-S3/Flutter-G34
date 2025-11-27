@@ -90,7 +90,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
           final activeBookings = bookings
               .where((b) => b.endsAt.isAfter(now) && b.status != 'cancelled')
               .toList();
-          
+
           final pastBookings = bookings
               .where((b) => b.endsAt.isBefore(now) || b.status == 'cancelled')
               .toList();
@@ -98,8 +98,10 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
           return TabBarView(
             controller: _tabController,
             children: [
-              _buildBookingsList(activeBookings, isEmptyMessage: 'No active bookings'),
-              _buildBookingsList(pastBookings, isEmptyMessage: 'No past bookings'),
+              _buildBookingsList(activeBookings,
+                  isEmptyMessage: 'No active bookings'),
+              _buildBookingsList(pastBookings,
+                  isEmptyMessage: 'No past bookings'),
             ],
           );
         },
@@ -107,7 +109,8 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
     );
   }
 
-  Widget _buildBookingsList(List<Booking> bookings, {required String isEmptyMessage}) {
+  Widget _buildBookingsList(List<Booking> bookings,
+      {required String isEmptyMessage}) {
     if (bookings.isEmpty) {
       return Center(
         child: Column(
@@ -140,7 +143,10 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
       padding: const EdgeInsets.all(16),
       itemCount: bookings.length,
       itemBuilder: (context, index) {
-        return BookingCard(booking: bookings[index]);
+        return BookingCard(
+          key: ValueKey(bookings[index].id),
+          booking: bookings[index],
+        );
       },
     );
   }
@@ -166,10 +172,18 @@ class _BookingCardState extends State<BookingCard> {
     _loadExperience();
   }
 
+  @override
+  void didUpdateWidget(BookingCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.booking.experienceId != oldWidget.booking.experienceId) {
+      _loadExperience();
+    }
+  }
+
   Future<void> _loadExperience() async {
     try {
-      final experience =
-          await _experienceService.getExperienceById(widget.booking.experienceId);
+      final experience = await _experienceService
+          .getExperienceById(widget.booking.experienceId);
       if (mounted) {
         setState(() {
           _experience = experience;
@@ -215,27 +229,28 @@ class _BookingCardState extends State<BookingCard> {
                       color: Colors.grey[200],
                       child: const Center(child: CircularProgressIndicator()),
                     )
-                    else if (_experience != null && _experience!.images.isNotEmpty)
-                      CachedNetworkImage(
-                        imageUrl: _experience!.images.first,
-                        fit: BoxFit.cover,
-                        placeholder: (context, url) => Container(
-                          color: Colors.grey[200],
-                          child: const Center(child: CircularProgressIndicator()),
-                        ),
-                        errorWidget: (context, url, error) => Container(
-                          color: Colors.grey[200],
-                          child: const Icon(Icons.broken_image,
-                              size: 40, color: Colors.grey),
-                        ),
-                      )
+                  else if (_experience != null &&
+                      _experience!.images.isNotEmpty)
+                    CachedNetworkImage(
+                      imageUrl: _experience!.images.first,
+                      fit: BoxFit.cover,
+                      placeholder: (context, url) => Container(
+                        color: Colors.grey[200],
+                        child: const Center(child: CircularProgressIndicator()),
+                      ),
+                      errorWidget: (context, url, error) => Container(
+                        color: Colors.grey[200],
+                        child: const Icon(Icons.broken_image,
+                            size: 40, color: Colors.grey),
+                      ),
+                    )
                   else
                     Container(
                       color: AppColors.forestGreen.withOpacity(0.1),
                       child: const Icon(Icons.image_not_supported,
                           size: 40, color: AppColors.forestGreen),
                     ),
-                  
+
                   // Status Badge
                   Positioned(
                     top: 12,
@@ -261,7 +276,6 @@ class _BookingCardState extends State<BookingCard> {
             ),
 
             // Booking Details
-
 
             // Booking Details
             Padding(
@@ -294,7 +308,8 @@ class _BookingCardState extends State<BookingCard> {
                         ),
                       ),
                       IconButton(
-                        icon: const Icon(Icons.delete_outline, color: Colors.red),
+                        icon:
+                            const Icon(Icons.delete_outline, color: Colors.red),
                         onPressed: () => _showDeleteConfirmation(context),
                         padding: EdgeInsets.zero,
                         constraints: const BoxConstraints(),
@@ -302,9 +317,7 @@ class _BookingCardState extends State<BookingCard> {
                       ),
                     ],
                   ),
-                  
                   const SizedBox(height: 8),
-                  
                   Row(
                     children: [
                       const Icon(Icons.calendar_today,
@@ -318,9 +331,7 @@ class _BookingCardState extends State<BookingCard> {
                       ),
                     ],
                   ),
-                  
                   const SizedBox(height: 4),
-                  
                   Row(
                     children: [
                       const Icon(Icons.people_outline,
@@ -334,11 +345,9 @@ class _BookingCardState extends State<BookingCard> {
                       ),
                     ],
                   ),
-                  
                   const SizedBox(height: 12),
                   const Divider(),
                   const SizedBox(height: 8),
-                  
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -392,7 +401,7 @@ class _BookingCardState extends State<BookingCard> {
         final bookingService = BookingService();
         await bookingService.deleteBooking(
             widget.booking.experienceId, widget.booking.id);
-        
+
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
