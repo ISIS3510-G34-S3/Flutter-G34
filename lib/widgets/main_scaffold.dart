@@ -50,6 +50,11 @@ class MainScaffold extends StatelessWidget {
                     label: 'Experiences',
                   ),
                   BottomNavigationBarItem(
+                    icon: Icon(Icons.chat_bubble_outline),
+                    activeIcon: Icon(Icons.chat_bubble),
+                    label: 'Messages',
+                  ),
+                  BottomNavigationBarItem(
                     icon: Icon(Icons.person_outline),
                     activeIcon: Icon(Icons.person),
                     label: 'Profile',
@@ -70,7 +75,8 @@ class MainScaffold extends StatelessWidget {
     if (location.startsWith('/my-bookings')) return 2;
     if (location.startsWith('/my-experiences') ||
         location.startsWith('/create')) return 3;
-    if (location.startsWith('/profile')) return 4;
+    if (location.startsWith('/messages')) return 4;
+    if (location.startsWith('/profile')) return 5;
     return 0; // Default to home
   }
 
@@ -89,6 +95,9 @@ class MainScaffold extends StatelessWidget {
         context.go('/my-experiences');
         break;
       case 4:
+        context.go('/messages');
+        break;
+      case 5:
         context.go('/profile/current');
         break;
     }

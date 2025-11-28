@@ -1,11 +1,14 @@
 import 'dart:async';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:travel_connect/models/host.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:travel_connect/models/experience.dart';
 import 'package:travel_connect/services/experience_service.dart';
 import 'package:travel_connect/services/host_service.dart';
+import 'package:travel_connect/services/chat_service.dart';
+import 'package:travel_connect/features/messaging/chat_detail_screen.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../../theme/colors.dart';
 import '../../theme/typography.dart';
@@ -1160,6 +1163,13 @@ class _ExperienceDetailScreenState extends State<ExperienceDetailScreen>
   }
 
   Widget _buildBottomActions(BuildContext context, Experience experience) {
+    final currentUserId = FirebaseAuth.instance.currentUser?.uid;
+    final isHost = currentUserId == experience.hostId;
+
+    if (isHost) {
+      return const SizedBox.shrink(); // Don't show actions for the host
+    }
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -1206,20 +1216,49 @@ class _ExperienceDetailScreenState extends State<ExperienceDetailScreen>
     );
   }
 
-  void _messageHost(BuildContext context, String hostId) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Messaging'),
-        content: const Text('This feature is coming soon!'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('OK'),
+  Future<void> _messageHost(BuildContext context, String hostId) async {
+    final currentUserId = FirebaseAuth.instance.currentUser?.uid;
+    if (currentUserId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please log in to message the host')),
+      );
+      return;
+    }
+
+    try {
+      // Show loading indicator
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) => const Center(child: CircularProgressIndicator()),
+      );
+
+      final chatId = await ChatService().getOrCreateChat(hostId);
+
+      // Dismiss loading indicator
+      if (context.mounted) Navigator.of(context).pop();
+
+      if (context.mounted) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ChatDetailScreen(
+              chatId: chatId,
+              otherUserName: _host?.name ?? 'Host',
+            ),
           ),
-        ],
-      ),
-    );
+        );
+      }
+    } catch (e) {
+      // Dismiss loading indicator if open
+      if (context.mounted) Navigator.of(context).pop();
+      
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error starting chat: $e')),
+        );
+      }
+    }
   }
 
   void _bookExperience(BuildContext context) {
