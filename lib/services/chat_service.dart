@@ -161,6 +161,18 @@ class ChatService {
       updates['unreadCounts.${_sanitizeKey(otherUserId)}'] = FieldValue.increment(1);
 
       await _firestore.collection('chats').doc(chatId).update(updates);
+
+      // Check if this is the very first message (count == 1 because we just added it)
+      final messagesSnapshot = await _firestore
+          .collection('chats')
+          .doc(chatId)
+          .collection('messages')
+          .count()
+          .get();
+
+      if (messagesSnapshot.count == 1) {
+        trackNewChatStarted();
+      }
     } catch (e) {
       // Offline writes are queued automatically and don't throw errors
       // Errors here typically mean Firestore isn't initialized
@@ -248,5 +260,46 @@ class ChatService {
       'participants': FieldValue.arrayRemove(toRemove),
     });
   }
-}
 
+  /// ANALYTICS: Track which quick reply is used most often
+  Future<void> trackQuickReplyUsage(String replyText) async {
+    try {
+      final String fieldName = replyText
+          .toLowerCase()
+          .replaceAll(RegExp(r'[^\w\s]'), '')
+          .replaceAll(' ', '_');
+
+      await _firestore.collection('analytics').doc('quick_replies').set({
+        fieldName: FieldValue.increment(1),
+        'last_updated': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+    } catch (e) {
+      print('⚠️ Failed to track quick reply: $e');
+    }
+  }
+
+  /// ANALYTICS: Track when a user starts a message from an Experience Detail screen
+  Future<void> trackMessageStartFromExperience(String experienceId) async {
+    try {
+      await _firestore.collection('analytics').doc('experience_message_starts').set({
+        experienceId: FieldValue.increment(1),
+        'total_starts': FieldValue.increment(1),
+        'last_updated': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+    } catch (e) {
+      print('⚠️ Failed to track message start: $e');
+    }
+  }
+
+  /// ANALYTICS: Track total new chats started
+  Future<void> trackNewChatStarted() async {
+    try {
+      await _firestore.collection('analytics').doc('messaging_global_usage').set({
+        'total_chats_started': FieldValue.increment(1),
+        'last_chat_started_at': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+    } catch (e) {
+      print('⚠️ Failed to track new chat started: $e');
+    }
+  }
+}
