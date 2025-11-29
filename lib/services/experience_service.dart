@@ -32,8 +32,7 @@ class ExperienceService {
   bool _isSyncing = false;
   final Set<String> _hostMetadataEnsured = <String>{};
 
-  static final ValueNotifier<bool> syncingNotifier =
-      ValueNotifier<bool>(false);
+  static final ValueNotifier<bool> syncingNotifier = ValueNotifier<bool>(false);
 
   static const String _placesApiKey = String.fromEnvironment(
     'GOOGLE_PLACES_API_KEY',
@@ -455,10 +454,8 @@ class ExperienceService {
 
   /// Stream all experiences
   Stream<List<models.Experience>> watchExperiences() {
-    return _firestore
-        .collection('experiences')
-        .snapshots()
-        .map((snapshot) => snapshot.docs
+    return _firestore.collection('experiences').snapshots().map((snapshot) =>
+        snapshot.docs
             .map((doc) => models.Experience.fromFirestore(doc))
             .toList());
   }
@@ -677,7 +674,8 @@ class ExperienceService {
         localImagePaths: localImagePaths,
       ),
     );
-    print('📥 Experience queued for later sync (offline) with ${localImagePaths.length} images');
+    print(
+        '📥 Experience queued for later sync (offline) with ${localImagePaths.length} images');
     return null; // Return null to indicate offline save
   }
 
@@ -689,8 +687,10 @@ class ExperienceService {
     final isOnline = await hasConnectivity();
 
     // Prepare data copies so original map isn't mutated
-    final Map<String, dynamic> onlineUpdates = Map<String, dynamic>.from(updates);
-    final Map<String, dynamic> offlineUpdates = Map<String, dynamic>.from(updates);
+    final Map<String, dynamic> onlineUpdates =
+        Map<String, dynamic>.from(updates);
+    final Map<String, dynamic> offlineUpdates =
+        Map<String, dynamic>.from(updates);
 
     // Normalize location for online update if needed
     if (onlineUpdates['location'] is Map) {
@@ -762,14 +762,16 @@ class ExperienceService {
           // Upload any pending local images first
           List<String> uploadedUrls = [];
           if (operation.localImagePaths.isNotEmpty) {
-            print('📤 Uploading ${operation.localImagePaths.length} pending images...');
+            print(
+                '📤 Uploading ${operation.localImagePaths.length} pending images...');
             uploadedUrls = await _uploadLocalImages(operation.localImagePaths);
             print('✓ Uploaded ${uploadedUrls.length} images');
           }
 
           if (operation.type == 'create') {
             // Merge uploaded URLs with any existing URLs in the data
-            final existingImages = (operation.data['images'] as List?)?.cast<String>() ?? [];
+            final existingImages =
+                (operation.data['images'] as List?)?.cast<String>() ?? [];
             final allImages = [...existingImages, ...uploadedUrls];
             final updatedData = Map<String, dynamic>.from(operation.data);
             updatedData['images'] = allImages;
@@ -802,10 +804,11 @@ class ExperienceService {
             // Update the experience
             if (operation.experienceId != null) {
               final updatedData = Map<String, dynamic>.from(operation.data);
-              
+
               // Merge uploaded URLs with existing if there are any
               if (uploadedUrls.isNotEmpty) {
-                final existingImages = (operation.data['images'] as List?)?.cast<String>() ?? [];
+                final existingImages =
+                    (operation.data['images'] as List?)?.cast<String>() ?? [];
                 updatedData['images'] = [...existingImages, ...uploadedUrls];
               }
 
@@ -834,7 +837,9 @@ class ExperienceService {
             }
           } else if (operation.type == 'delete') {
             if (operation.experienceId != null) {
-              final images = (operation.data['images'] as List?)?.cast<String>() ?? const [];
+              final images =
+                  (operation.data['images'] as List?)?.cast<String>() ??
+                      const [];
               await _deleteExperienceAndImagesOnline(operation.experienceId!,
                   imageUrls: images);
               print('✓ Synced pending delete operation: ${operation.id}');
@@ -863,29 +868,32 @@ class ExperienceService {
   /// Upload local images to Firebase Storage
   /// Returns list of download URLs
   Future<List<String>> _uploadLocalImages(List<String> localPaths) async {
-    final List<String> downloadUrls = [];
     final user = _auth.currentUser;
     if (user == null) {
       print('❌ No authenticated user for image upload');
-      return downloadUrls;
+      return [];
     }
 
     final storage = FirebaseStorage.instanceFor(
       bucket: 'gs://travelappbd-8e204.firebasestorage.app',
     );
 
-    for (final localPath in localPaths) {
+    final uploadFutures = localPaths.asMap().entries.map((entry) async {
+      final index = entry.key;
+      final localPath = entry.value;
       try {
         final file = File(localPath);
         if (!await file.exists()) {
           print('⚠️ Local image not found: $localPath');
-          continue;
+          return null;
         }
 
         final String uid = user.uid;
-        final String timestamp = DateTime.now().millisecondsSinceEpoch.toString();
+        final String timestamp =
+            DateTime.now().millisecondsSinceEpoch.toString();
         final String extension = localPath.split('.').last;
-        final String fileName = 'photo_$timestamp.$extension';
+        // Add index to ensure uniqueness even if timestamp is identical
+        final String fileName = 'photo_${timestamp}_$index.$extension';
 
         final bytes = await file.readAsBytes();
         final ref = storage.ref().child('experiences/$uid/$fileName');
@@ -894,15 +902,16 @@ class ExperienceService {
           SettableMetadata(contentType: 'image/jpeg'),
         );
         final String downloadUrl = await uploadTask.ref.getDownloadURL();
-        downloadUrls.add(downloadUrl);
         print('✓ Uploaded: $fileName');
+        return downloadUrl;
       } catch (e) {
         print('❌ Failed to upload image $localPath: $e');
-        // Continue with next image
+        return null;
       }
-    }
+    });
 
-    return downloadUrls;
+    final results = await Future.wait(uploadFutures);
+    return results.whereType<String>().toList();
   }
 
   Future<void> _resolveLocationIfNeeded(Map<String, dynamic> data) async {
