@@ -105,13 +105,6 @@ final GoRouter appRouter = GoRouter(
           builder: (context, state) => const MyExperiencesScreen(),
         ),
 
-        // Messaging route
-        GoRoute(
-          path: '/messages',
-          name: 'messages',
-          builder: (context, state) => const MessagingScreen(),
-        ),
-
         // Profile route (current user)
         GoRoute(
           path: '/profile/:id',
@@ -172,11 +165,11 @@ final GoRouter appRouter = GoRouter(
     ),
 
     // Messaging route (standalone)
-    // GoRoute(
-    //   path: '/messages',
-    //   name: 'messages',
-    //   builder: (context, state) => const MessagingScreen(),
-    // ),
+    GoRoute(
+      path: '/messages',
+      name: 'messages',
+      builder: (context, state) => const MessagingScreen(),
+    ),
 
     // Chatbot route (standalone)
     GoRoute(
