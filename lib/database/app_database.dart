@@ -62,18 +62,36 @@ class Users extends Table {
   Set<Column> get primaryKey => {id};
 }
 
+/// Messages table - stores chat messages locally
+class Messages extends Table {
+  TextColumn get id => text()();
+  TextColumn get chatId => text()();
+  TextColumn get senderId => text()();
+  TextColumn get content => text()();
+  DateTimeColumn get createdAt => dateTime()();
+  BoolColumn get isRead => boolean().withDefault(const Constant(false))();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
 /// The Drift database that manages local SQLite storage
-@DriftDatabase(tables: [Experiences, Users])
+@DriftDatabase(tables: [Experiences, Users, Messages])
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
         onCreate: (Migrator m) async {
           await m.createAll();
+        },
+        onUpgrade: (Migrator m, int from, int to) async {
+          if (from < 2) {
+            await m.createTable(messages);
+          }
         },
       );
 
@@ -218,6 +236,25 @@ class AppDatabase extends _$AppDatabase {
     // For now, return the value from the users table if available
     final user = await getUserById(userId);
     return user?.joinedExperiences ?? 0;
+  }
+
+  // ============================================
+  // MESSAGING OPERATIONS
+  // ============================================
+
+  /// Get messages for a specific chat
+  Future<List<Message>> getMessagesForChat(String chatId) async {
+    return await (select(messages)
+          ..where((m) => m.chatId.equals(chatId))
+          ..orderBy([(m) => OrderingTerm(expression: m.createdAt, mode: OrderingMode.desc)]))
+        .get();
+  }
+
+  /// Batch upsert messages
+  Future<void> upsertMessages(List<MessagesCompanion> messageList) async {
+    await batch((batch) {
+      batch.insertAllOnConflictUpdate(messages, messageList);
+    });
   }
 
   // ============================================

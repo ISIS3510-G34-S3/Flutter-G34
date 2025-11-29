@@ -10,6 +10,10 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:travel_connect/widgets/experience_card.dart';
 import 'package:travel_connect/widgets/connectivity_wrapper.dart';
 
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:travel_connect/features/messaging/chat_detail_screen.dart';
+import 'package:travel_connect/services/chat_service.dart';
+
 class HostScreen extends StatefulWidget {
   final String hostId;
   const HostScreen({super.key, required this.hostId});
@@ -429,6 +433,19 @@ class _HostScreenState extends State<HostScreen> with ConnectivityAware {
   }
 
   Widget _buildBottomActions(BuildContext context) {
+    final user = FirebaseAuth.instance.currentUser;
+    final currentUserId = user?.uid;
+    final currentUserEmail = user?.email;
+    final hostId = widget.hostId;
+
+    // Robust host check: compare against both UID and Email
+    // This handles cases where hostId might be an email address or a UID
+    final isHost = currentUserId == hostId ||
+        (currentUserEmail != null &&
+            currentUserEmail.toLowerCase() == hostId.toLowerCase()) ||
+        (currentUserEmail != null &&
+            currentUserEmail.toLowerCase() == hostId);
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -443,7 +460,9 @@ class _HostScreenState extends State<HostScreen> with ConnectivityAware {
       ),
       child: SafeArea(
         child: ElevatedButton.icon(
-          onPressed: () => _showComingSoonDialog(context, 'Messaging'),
+          onPressed: isHost
+              ? null // Disable if viewing own profile
+              : () => _messageHost(context),
           icon: const Icon(Icons.message_outlined),
           label: const Text('Message Host'),
           style: ElevatedButton.styleFrom(
@@ -454,19 +473,48 @@ class _HostScreenState extends State<HostScreen> with ConnectivityAware {
     );
   }
 
-  void _showComingSoonDialog(BuildContext context, String feature) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(feature),
-        content: const Text('This feature is coming soon!'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('OK'),
+  Future<void> _messageHost(BuildContext context) async {
+    final currentUserId = FirebaseAuth.instance.currentUser?.uid;
+    if (currentUserId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please log in to message the host')),
+      );
+      return;
+    }
+
+    try {
+      // Show loading indicator
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) => const Center(child: CircularProgressIndicator()),
+      );
+
+      final chatId = await ChatService().getOrCreateChat(widget.hostId);
+
+      // Dismiss loading indicator
+      if (context.mounted) Navigator.of(context).pop();
+
+      if (context.mounted) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ChatDetailScreen(
+              chatId: chatId,
+              otherUserName: _host?.name ?? 'Host',
+            ),
           ),
-        ],
-      ),
-    );
+        );
+      }
+    } catch (e) {
+      // Dismiss loading indicator if open
+      if (context.mounted) Navigator.of(context).pop();
+
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error starting chat: $e')),
+        );
+      }
+    }
   }
 }

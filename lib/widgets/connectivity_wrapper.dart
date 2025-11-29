@@ -59,7 +59,8 @@ class _ConnectivityWrapperState extends State<ConnectivityWrapper> {
     });
 
     // Start monitoring connectivity changes
-    _connectivityService.startMonitoring((isOnline) {
+    _connectivityService.startMonitoring();
+    _connectivityService.connectivityStream.listen((isOnline) {
       if (mounted) {
         setState(() {
           _isOnline = isOnline;
@@ -71,7 +72,7 @@ class _ConnectivityWrapperState extends State<ConnectivityWrapper> {
 
   @override
   void dispose() {
-    _connectivityService.stopMonitoring();
+    // We don't stop global monitoring here anymore
     super.dispose();
   }
 
@@ -233,7 +234,8 @@ mixin ConnectivityAware<T extends StatefulWidget> on State<T> {
       }
     });
 
-    connectivityService.startMonitoring((online) {
+    connectivityService.startMonitoring();
+    connectivityService.connectivityStream.listen((online) {
       if (mounted) {
         setState(() {
           isOnline = online;
@@ -245,7 +247,7 @@ mixin ConnectivityAware<T extends StatefulWidget> on State<T> {
 
   @override
   void dispose() {
-    connectivityService.stopMonitoring();
+    // connectivityService.stopMonitoring(); // Don't stop global monitoring
     super.dispose();
   }
 

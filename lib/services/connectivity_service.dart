@@ -156,41 +156,44 @@ class ConnectivityService {
     }
   }
 
+  /// Stream controller for broadcasting connectivity status
+  final _connectivityController = StreamController<bool>.broadcast();
+
+  /// Public stream of connectivity status
+  Stream<bool> get connectivityStream => _connectivityController.stream;
+
   /// Start monitoring connectivity changes with periodic verification
-  void startMonitoring(Function(bool isOnline) onConnectivityChanged) {
-    stopMonitoring(); // Clean up any existing monitoring
+  void startMonitoring() {
+    // If already monitoring, just return existing stream
+    if (_connectivitySubscription != null) return;
+    
+    debugPrint('🚀 [ConnectivityService] Monitoring started globally');
 
     // Initial check (optimistic)
     checkConnectivity(isInitialCheck: true).then((isOnline) {
-      onConnectivityChanged(isOnline);
+      _connectivityController.add(isOnline);
     });
 
     // Listen to device connectivity changes (WiFi/Mobile/None)
     _connectivitySubscription = _connectivity.onConnectivityChanged.listen(
       (List<ConnectivityResult> results) async {
         final hasConnection = !results.contains(ConnectivityResult.none);
-        debugPrint(
-            '📡 [ConnectivityService] Device connectivity changed: $results');
-
+        
         if (!hasConnection) {
           // Device lost all connections
           if (_isOnline) {
             _isOnline = false;
-            debugPrint(
-                '❌ [ConnectivityService] Lost all connections - going OFFLINE');
-            onConnectivityChanged(false);
+            debugPrint('❌ [ConnectivityService] Lost all connections - going OFFLINE');
+            _connectivityController.add(false);
           }
         } else {
           // Device gained connection - verify with HTTP test
-          debugPrint(
-              '🔄 [ConnectivityService] Device gained connection - verifying...');
           final wasOnline = _isOnline;
           await checkConnectivity();
 
           if (wasOnline != _isOnline) {
-            debugPrint(
-                '📡 [ConnectivityService] Status changed: ${_isOnline ? "ONLINE" : "OFFLINE"}');
-            onConnectivityChanged(_isOnline);
+             debugPrint('📡 [ConnectivityService] Status changed: ${_isOnline ? "ONLINE" : "OFFLINE"}');
+            _connectivityController.add(_isOnline);
           }
         }
       },
@@ -198,25 +201,30 @@ class ConnectivityService {
 
     // Periodic HTTP reachability checks (handles edge cases)
     _periodicCheckTimer = Timer.periodic(_periodicCheckInterval, (timer) async {
-      debugPrint('⏰ [ConnectivityService] Periodic connectivity check...');
       final wasOnline = _isOnline;
       await checkConnectivity();
 
       if (wasOnline != _isOnline) {
-        debugPrint(
-            '📡 [ConnectivityService] Periodic check detected change: ${_isOnline ? "ONLINE" : "OFFLINE"}');
-        onConnectivityChanged(_isOnline);
+        debugPrint('📡 [ConnectivityService] Periodic check detected change: ${_isOnline ? "ONLINE" : "OFFLINE"}');
+        _connectivityController.add(_isOnline);
       }
     });
   }
 
-  /// Stop listening to connectivity changes
+  /// Stop listening to connectivity changes (Should generally not be called in app lifecycle)
   void stopMonitoring() {
+    // Intentionally empty to prevent stopping global monitoring from individual widgets
+    // Only call forceStopMonitoring() if you really mean it.
+  }
+  
+  /// Force stop monitoring (for testing or app shutdown)
+  void forceStopMonitoring() {
     _connectivitySubscription?.cancel();
     _connectivitySubscription = null;
     _periodicCheckTimer?.cancel();
     _periodicCheckTimer = null;
-    debugPrint('🛑 [ConnectivityService] Monitoring stopped');
+    _connectivityController.close();
+    debugPrint('🛑 [ConnectivityService] Monitoring forced stopped');
   }
 
   /// Dispose resources
