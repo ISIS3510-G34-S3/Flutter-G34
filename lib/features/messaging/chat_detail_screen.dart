@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../services/chat_service.dart';
+import '../../services/connectivity_service.dart'; // Import ConnectivityService
 import '../../models/chat_message.dart';
+import '../../theme/colors.dart';
+import '../../theme/typography.dart';
 
 class ChatDetailScreen extends StatefulWidget {
   final String chatId;
@@ -20,13 +23,35 @@ class ChatDetailScreen extends StatefulWidget {
 class _ChatDetailScreenState extends State<ChatDetailScreen> {
   final TextEditingController _messageController = TextEditingController();
   final ChatService _chatService = ChatService();
+  final ConnectivityService _connectivityService = ConnectivityService();
   final ScrollController _scrollController = ScrollController();
+  bool _isOnline = true;
 
   @override
   void initState() {
     super.initState();
     // Mark messages as read when entering the screen
     _chatService.markChatAsRead(widget.chatId);
+    
+    _initializeConnectivity();
+  }
+
+  void _initializeConnectivity() {
+    _connectivityService.startMonitoring();
+    
+    _connectivityService.connectivityStream.listen((isOnline) {
+      if (mounted) {
+        setState(() => _isOnline = isOnline);
+      }
+    });
+    
+    setState(() => _isOnline = _connectivityService.isOnline);
+  }
+
+  @override
+  void dispose() {
+    // Do not stop global monitoring
+    super.dispose();
   }
 
   void _sendMessage() {
@@ -55,6 +80,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       ),
       body: Column(
         children: [
+          if (!_isOnline) _buildOfflineBanner(),
           Expanded(
             child: StreamBuilder<List<ChatMessage>>(
               stream: _chatService.getMessagesStream(widget.chatId),
@@ -91,6 +117,35 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
           ),
           _buildMessageInput(),
         ],
+      ),
+    );
+  }
+
+  Widget _buildOfflineBanner() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      color: AppColors.oliveGold.withValues(alpha: 0.2),
+      child: SafeArea(
+        bottom: false,
+        child: Row(
+          children: [
+            Icon(
+              Icons.cloud_off,
+              size: 16,
+              color: AppColors.oliveGold,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'No internet connection - using offline data',
+                style: AppTypography.bodySmall.copyWith(
+                  color: AppColors.oliveGold,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

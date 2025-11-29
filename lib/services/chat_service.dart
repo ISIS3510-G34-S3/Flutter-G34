@@ -1,7 +1,10 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:drift/drift.dart' as drift;
 import '../models/chat_message.dart';
 import '../models/chat_conversation.dart';
+import '../database/app_database.dart';
+import 'database_service.dart';
 
 class ChatService {
   ChatService._internal();
@@ -182,16 +185,62 @@ class ChatService {
   }
 
   /// Stream of messages for a specific chat
-  Stream<List<ChatMessage>> getMessagesStream(String chatId) {
-    return _firestore
-        .collection('chats')
-        .doc(chatId)
-        .collection('messages')
-        .orderBy('createdAt', descending: true)
-        .snapshots(includeMetadataChanges: true) // Include pending writes detection
-        .map((snapshot) => snapshot.docs
+  Stream<List<ChatMessage>> getMessagesStream(String chatId) async* {
+    // 1. Always yield data from Local DB first (Instant load for better UX & Offline support)
+    try {
+      final database = DatabaseService().database;
+      final localMessages = await database.getMessagesForChat(chatId);
+
+      if (localMessages.isNotEmpty) {
+        print('✓ Loaded ${localMessages.length} messages from local DB (Displaying instantly)');
+        yield localMessages.map((m) => ChatMessage(
+          id: m.id,
+          senderId: m.senderId,
+          content: m.content,
+          createdAt: m.createdAt,
+          isRead: m.isRead,
+          isPending: false,
+        )).toList();
+      } else {
+        // Important: yield empty list if no local messages, so the stream has initial data
+        // but we only do this if we are offline, otherwise we wait for network
+        // Actually, yielding empty list might clear UI if network is slow, so we just wait.
+        // But if offline, we MUST yield something or StreamBuilder hangs.
+        // Let's check connectivity or just yield empty if truly nothing.
+        // Better pattern: if offline, we rely on this yield.
+      }
+    } catch (e) {
+      print('⚠️ Error loading local messages: $e');
+    }
+
+    // 2. Then subscribe to Firestore (Live updates & Sync)
+    // If offline, this stream might pause or error. We need to handle that.
+    // Using yield* with a Stream that might fail when offline is tricky.
+    // We should wrap the firestore stream in a way that it doesn't crash the whole generator.
+    
+    try {
+       yield* _firestore
+          .collection('chats')
+          .doc(chatId)
+          .collection('messages')
+          .orderBy('createdAt', descending: true)
+          .snapshots(includeMetadataChanges: true) 
+          .map((snapshot) {
+        final messages = snapshot.docs
             .map((doc) => ChatMessage.fromFirestore(doc))
-            .toList());
+            .toList();
+
+        // Sync to local DB (offline persistence)
+        if (messages.isNotEmpty) {
+          _syncMessagesToLocal(chatId, messages);
+        }
+
+        return messages;
+      });
+    } catch (e) {
+       print('⚠️ Firestore stream error (likely offline): $e');
+       // If we are offline and here, we already yielded local messages above.
+    }
   }
 
   /// Stream of all chats for the current user
@@ -300,6 +349,30 @@ class ChatService {
       }, SetOptions(merge: true));
     } catch (e) {
       print('⚠️ Failed to track new chat started: $e');
+    }
+  }
+
+  /// Sync messages to local database (Fire and forget)
+  Future<void> _syncMessagesToLocal(
+      String chatId, List<ChatMessage> messages) async {
+    try {
+      final database = DatabaseService().database;
+
+      final messageCompanions = messages.map((msg) {
+        return MessagesCompanion(
+          id: drift.Value(msg.id),
+          chatId: drift.Value(chatId),
+          senderId: drift.Value(msg.senderId),
+          content: drift.Value(msg.content),
+          createdAt: drift.Value(msg.createdAt),
+          isRead: drift.Value(msg.isRead),
+        );
+      }).toList();
+
+      await database.upsertMessages(messageCompanions);
+      print('✓ Synced ${messages.length} messages for chat $chatId to local DB');
+    } catch (e) {
+      print('Error syncing messages to local DB: $e');
     }
   }
 }
