@@ -1163,12 +1163,15 @@ class _ExperienceDetailScreenState extends State<ExperienceDetailScreen>
   }
 
   Widget _buildBottomActions(BuildContext context, Experience experience) {
-    final currentUserId = FirebaseAuth.instance.currentUser?.uid;
-    final isHost = currentUserId == experience.hostId;
-
-    if (isHost) {
-      return const SizedBox.shrink(); // Don't show actions for the host
-    }
+    final user = FirebaseAuth.instance.currentUser;
+    final currentUserId = user?.uid;
+    final currentUserEmail = user?.email;
+    
+    // Check if current user is host (compare against both UID and Email/ID)
+    final isHost = currentUserId == experience.hostId || 
+                   (currentUserEmail != null && currentUserEmail.toLowerCase() == experience.hostId.toLowerCase()) ||
+                   // Also check if the hostId matches the email-based ID format if used
+                   (currentUserEmail != null && currentUserEmail.toLowerCase() == experience.hostId);
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -1188,11 +1191,14 @@ class _ExperienceDetailScreenState extends State<ExperienceDetailScreen>
             // Message Host button
             Expanded(
               child: OutlinedButton.icon(
-                onPressed: () => _messageHost(context, experience.hostId),
+                onPressed: isHost
+                    ? null // Disable for host
+                    : () => _messageHost(context, experience.hostId),
                 icon: const Icon(Icons.message_outlined),
                 label: const Text('Message'),
                 style: OutlinedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 12),
+                  // Style changes when disabled are handled automatically by Flutter
                 ),
               ),
             ),
@@ -1202,11 +1208,14 @@ class _ExperienceDetailScreenState extends State<ExperienceDetailScreen>
             // Book Experience button
             Expanded(
               child: ElevatedButton.icon(
-                onPressed: () => _bookExperience(context),
+                onPressed: isHost
+                    ? null // Disable for host
+                    : () => _bookExperience(context),
                 icon: const Icon(Icons.calendar_today),
                 label: const Text('Book'),
                 style: ElevatedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 12),
+                  // Style changes when disabled are handled automatically by Flutter
                 ),
               ),
             ),
