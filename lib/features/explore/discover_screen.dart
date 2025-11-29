@@ -7,6 +7,8 @@ import '../../widgets/filters_bottom_sheet.dart';
 import '../../widgets/connectivity_wrapper.dart';
 import 'discover_view_model.dart';
 
+import 'package:flutter/cupertino.dart';
+
 /// Discover screen with search, filters, and experience listings
 class DiscoverScreen extends StatefulWidget {
   const DiscoverScreen({super.key});
@@ -59,6 +61,13 @@ class _DiscoverScreenState extends State<DiscoverScreen>
         backgroundColor: AppColors.forestGreen,
         elevation: 0,
         automaticallyImplyLeading: false,
+        actions: [
+          IconButton(
+            icon: const Icon(CupertinoIcons.paperplane, color: AppColors.white),
+            onPressed: () => context.push('/messages'),
+          ),
+          const SizedBox(width: 12),
+        ],
       ),
       body: GestureDetector(
         onTap: () {
