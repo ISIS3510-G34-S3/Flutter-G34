@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../theme/colors.dart';
@@ -19,6 +20,7 @@ class _DiscoverScreenState extends State<DiscoverScreen>
     with ConnectivityAware {
   final _searchController = TextEditingController();
   late DiscoverViewModel _viewModel;
+  Timer? _debounce;
 
   @override
   void initState() {
@@ -37,6 +39,7 @@ class _DiscoverScreenState extends State<DiscoverScreen>
   @override
   void dispose() {
     _searchController.dispose();
+    _debounce?.cancel();
     _viewModel.removeListener(_onViewModelChanged);
     _viewModel.dispose();
     super.dispose();
@@ -144,7 +147,12 @@ class _DiscoverScreenState extends State<DiscoverScreen>
                     const BorderSide(color: AppColors.forestGreen, width: 2),
               ),
             ),
-            onChanged: (value) => _viewModel.updateSearchQuery(value),
+            onChanged: (value) {
+              if (_debounce?.isActive ?? false) _debounce!.cancel();
+              _debounce = Timer(const Duration(milliseconds: 500), () {
+                _viewModel.updateSearchQuery(value);
+              });
+            },
           ),
 
           const SizedBox(height: 16),
