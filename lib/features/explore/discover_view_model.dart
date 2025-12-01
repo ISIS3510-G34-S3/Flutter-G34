@@ -22,6 +22,12 @@ class DiscoverViewModel extends ChangeNotifier {
   bool _isOnline = true;
   bool _isRefreshing = false;
 
+  // Pagination state
+  static const int _pageSize = 10;
+  bool _hasMoreData = true;
+  bool _isLoadingMore = false;
+  int _currentPage = 0;
+
   // Filter state
   String _searchQuery = '';
   List<String> _selectedCategories = [];
@@ -37,6 +43,8 @@ class DiscoverViewModel extends ChangeNotifier {
   bool get isLoading => _isLoading;
   bool get isOnline => _isOnline;
   bool get isRefreshing => _isRefreshing;
+  bool get hasMoreData => _hasMoreData;
+  bool get isLoadingMore => _isLoadingMore;
   String get searchQuery => _searchQuery;
   List<String> get selectedCategories => _selectedCategories;
   List<String> get selectedRegions => _selectedRegions;
@@ -113,12 +121,16 @@ class DiscoverViewModel extends ChangeNotifier {
     }
   }
 
-  /// Fetch experiences from service
+  /// Fetch initial page of experiences from service with pagination
   Future<void> fetchExperiences({bool forceRefresh = false}) async {
     if (_isRefreshing && !_isLoading) {
       debugPrint('⚠️ Already refreshing, skipping duplicate request');
       return; // Prevent multiple simultaneous refreshes
     }
+
+    // Reset pagination state on fresh fetch
+    _currentPage = 0;
+    _hasMoreData = true;
 
     if (!_isLoading) {
       _isRefreshing = true;
@@ -129,18 +141,26 @@ class DiscoverViewModel extends ChangeNotifier {
 
     try {
       debugPrint(
-          '📞 ViewModel: Calling service.getExperiences(forceRefresh: $forceRefresh)');
-      final experiences =
-          await _experienceService.getExperiences(forceRefresh: forceRefresh);
+          '📞 ViewModel: Calling service.getExperiencesPaginated (page: 0, limit: $_pageSize)');
+      final experiences = await _experienceService.getExperiencesPaginated(
+        limit: _pageSize,
+        offset: 0,
+        forceRefresh: forceRefresh,
+      );
       debugPrint(
           '✅ ViewModel: Received ${experiences.length} experiences from service');
 
       // Force new list instances to ensure change detection
       _allExperiences = List.from(experiences);
+
+      // Check if we have more data
+      _hasMoreData = experiences.length >= _pageSize;
+      _currentPage = 1;
+
       _filterExperiences();
 
       debugPrint(
-          '✅ ViewModel: Filtered to ${_filteredExperiences.length} experiences');
+          '✅ ViewModel: Filtered to ${_filteredExperiences.length} experiences, hasMore: $_hasMoreData');
       debugPrint(
           '📝 ViewModel: First 3 experience IDs: ${_filteredExperiences.take(3).map((e) => e.id).join(", ")}');
 
@@ -153,6 +173,55 @@ class DiscoverViewModel extends ChangeNotifier {
       _isRefreshing = false;
       notifyListeners();
       debugPrint('❌ ViewModel: Error fetching experiences: $e');
+    }
+  }
+
+  /// Load more experiences for infinite scroll
+  Future<void> loadMoreExperiences() async {
+    if (_isLoadingMore || !_hasMoreData || _isLoading) {
+      debugPrint(
+          '⚠️ Skipping loadMore: isLoadingMore=$_isLoadingMore, hasMore=$_hasMoreData, isLoading=$_isLoading');
+      return;
+    }
+
+    _isLoadingMore = true;
+    notifyListeners();
+
+    try {
+      final offset = _currentPage * _pageSize;
+      debugPrint(
+          '📞 ViewModel: Loading more experiences (page: $_currentPage, offset: $offset)');
+
+      final moreExperiences = await _experienceService.getExperiencesPaginated(
+        limit: _pageSize,
+        offset: offset,
+        forceRefresh: false,
+      );
+
+      if (moreExperiences.isEmpty) {
+        _hasMoreData = false;
+        debugPrint('📭 No more experiences to load');
+      } else {
+        // Add new experiences to existing list (avoid duplicates)
+        final existingIds = _allExperiences.map((e) => e.id).toSet();
+        final newExperiences =
+            moreExperiences.where((e) => !existingIds.contains(e.id)).toList();
+
+        _allExperiences.addAll(newExperiences);
+        _hasMoreData = moreExperiences.length >= _pageSize;
+        _currentPage++;
+
+        _filterExperiences();
+        debugPrint(
+            '✅ Loaded ${newExperiences.length} more experiences, total: ${_allExperiences.length}');
+      }
+
+      _isLoadingMore = false;
+      notifyListeners();
+    } catch (e) {
+      _isLoadingMore = false;
+      notifyListeners();
+      debugPrint('❌ Error loading more experiences: $e');
     }
   }
 

@@ -39,6 +39,146 @@ class ExperienceService {
     defaultValue: 'AIzaSyA0TPkWq9uNvEA0Qhw2NVBihLbRTroYabE',
   );
 
+  /// Get experiences with pagination support for infinite scroll
+  /// Uses offline-first strategy with limit/offset for efficient loading
+  ///
+  /// [limit] - Number of experiences to fetch per page
+  /// [offset] - Starting position for pagination
+  /// [forceRefresh] - Force fetch from server, bypassing cache
+  Future<List<models.Experience>> getExperiencesPaginated({
+    required int limit,
+    required int offset,
+    bool forceRefresh = false,
+  }) async {
+    List<models.Experience> experiences = [];
+
+    if (forceRefresh) {
+      print(
+          '📡 Paginated fetch from Firebase server (limit: $limit, offset: $offset)...');
+      try {
+        final serverSnapshot = await _firestore
+            .collection('experiences')
+            .orderBy('createdAt', descending: true)
+            .limit(limit + offset) // Fetch enough to skip offset
+            .get(const GetOptions(source: Source.server));
+
+        if (serverSnapshot.docs.isNotEmpty) {
+          final allDocs = serverSnapshot.docs;
+          // Skip 'offset' documents and take 'limit' documents
+          final paginatedDocs = allDocs.skip(offset).take(limit).toList();
+          experiences = paginatedDocs
+              .map((doc) => models.Experience.fromFirestore(doc))
+              .toList();
+          print(
+              '✅ Loaded ${experiences.length} paginated experiences from server');
+
+          // Sync to local database if it's the first page
+          if (offset == 0) {
+            final allExperiences = allDocs
+                .map((doc) => models.Experience.fromFirestore(doc))
+                .toList();
+            await _syncServerToLocalDB(allExperiences);
+          }
+        }
+        return experiences;
+      } catch (e) {
+        print('❌ Server error during paginated fetch: $e');
+        // Fall back to local database
+        return _getExperiencesFromLocalDB(limit: limit, offset: offset);
+      }
+    }
+
+    // Try cache first
+    try {
+      final cacheSnapshot = await _firestore
+          .collection('experiences')
+          .orderBy('createdAt', descending: true)
+          .limit(limit + offset)
+          .get(const GetOptions(source: Source.cache));
+
+      if (cacheSnapshot.docs.isNotEmpty) {
+        final paginatedDocs =
+            cacheSnapshot.docs.skip(offset).take(limit).toList();
+        experiences = paginatedDocs
+            .map((doc) => models.Experience.fromFirestore(doc))
+            .toList();
+        print(
+            '✅ Loaded ${experiences.length} paginated experiences from cache');
+
+        // Sync to local DB in background
+        if (offset == 0) {
+          final allExperiences = cacheSnapshot.docs
+              .map((doc) => models.Experience.fromFirestore(doc))
+              .toList();
+          _syncCacheToLocalDB(allExperiences);
+        }
+        return experiences;
+      }
+    } catch (e) {
+      print('Cache miss for paginated fetch: $e');
+    }
+
+    // Try local database
+    experiences =
+        await _getExperiencesFromLocalDB(limit: limit, offset: offset);
+    if (experiences.isNotEmpty) {
+      return experiences;
+    }
+
+    // Try server as last resort
+    try {
+      final serverSnapshot = await _firestore
+          .collection('experiences')
+          .orderBy('createdAt', descending: true)
+          .limit(limit + offset)
+          .get();
+
+      if (serverSnapshot.docs.isNotEmpty) {
+        final paginatedDocs =
+            serverSnapshot.docs.skip(offset).take(limit).toList();
+        experiences = paginatedDocs
+            .map((doc) => models.Experience.fromFirestore(doc))
+            .toList();
+        print(
+            '✅ Loaded ${experiences.length} paginated experiences from server');
+
+        // Sync all to local database
+        final allExperiences = serverSnapshot.docs
+            .map((doc) => models.Experience.fromFirestore(doc))
+            .toList();
+        await _syncServerToLocalDB(allExperiences);
+      }
+    } catch (e) {
+      print('❌ Server error: $e');
+    }
+
+    return experiences;
+  }
+
+  /// Get experiences from local SQLite database with pagination
+  Future<List<models.Experience>> _getExperiencesFromLocalDB({
+    required int limit,
+    required int offset,
+  }) async {
+    try {
+      final localExperiences = await _database.getExperiencesPaginated(
+        limit: limit,
+        offset: offset,
+      );
+      if (localExperiences.isNotEmpty) {
+        final experiences = localExperiences
+            .map((e) => DatabaseConverters.experienceFromDrift(e))
+            .toList();
+        print(
+            '✅ Loaded ${experiences.length} paginated experiences from local DB');
+        return experiences;
+      }
+    } catch (e) {
+      print('❌ Local database pagination error: $e');
+    }
+    return [];
+  }
+
   /// Get experiences with offline-first strategy:
   /// 1. Try Firebase Cache (in-memory, fastest)
   /// 2. Fall back to Local SQLite Database (persistent, offline)
@@ -56,7 +196,7 @@ class ExperienceService {
     // If forceRefresh is true, skip cache/local and fetch directly from server
     // This mimics what happens when changing screens but forces a server fetch
     if (forceRefresh) {
-      print('� Force refresh: Fetching directly from Firebase server...');
+      print('🔄 Force refresh: Fetching directly from Firebase server...');
 
       // Skip STEP 1 (Firebase Cache) and STEP 2 (Local DB)
       // Go directly to STEP 3 (Firebase Server)

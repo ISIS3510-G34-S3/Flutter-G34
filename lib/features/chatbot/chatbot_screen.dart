@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../services/chatbot_service.dart';
+import '../../services/booking_service.dart';
 import '../../widgets/experience_card.dart';
 import '../../widgets/connectivity_wrapper.dart';
+import '../../theme/colors.dart';
 
 class ChatbotScreen extends StatefulWidget {
   const ChatbotScreen({super.key});
@@ -13,10 +15,13 @@ class ChatbotScreen extends StatefulWidget {
 
 class _ChatbotScreenState extends State<ChatbotScreen> with ConnectivityAware {
   final ChatbotService _chatbotService = ChatbotService();
+  final BookingService _bookingService = BookingService();
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final List<ChatMessage> _messages = [];
   bool _isLoading = false;
+  bool _hasBookings = false;
+  bool _suggestionUsed = false;
 
   @override
   void initState() {
@@ -30,6 +35,21 @@ class _ChatbotScreenState extends State<ChatbotScreen> with ConnectivityAware {
         timestamp: DateTime.now(),
       ),
     );
+    _checkUserBookings();
+  }
+
+  Future<void> _checkUserBookings() async {
+    try {
+      final bookingsStream = _bookingService.getBookingsByTraveler();
+      final bookings = await bookingsStream.first;
+      if (mounted) {
+        setState(() {
+          _hasBookings = bookings.isNotEmpty;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error checking user bookings: $e');
+    }
   }
 
   @override
@@ -102,6 +122,72 @@ class _ChatbotScreenState extends State<ChatbotScreen> with ConnectivityAware {
     });
   }
 
+  Future<void> _sendSuggestedMessage() async {
+    // Check connectivity before sending
+    if (!isOnline) {
+      showOfflineSnackbar(
+          'Chatbot requires an internet connection to respond.');
+      return;
+    }
+
+    const suggestedMessage = 'Based on my previous bookings, what experience would you recommend for me? I\'m looking for something similar to what I\'ve enjoyed before.';
+
+    setState(() {
+      _messages.add(ChatMessage(
+        text: suggestedMessage,
+        isUser: true,
+        timestamp: DateTime.now(),
+      ));
+      _isLoading = true;
+      _suggestionUsed = true;
+    });
+
+    // Scroll to bottom
+    _scrollToBottom();
+
+    try {
+      // Fetch user's bookings to send to chatbot for personalized recommendations
+      final bookingsStream = _bookingService.getBookingsByTraveler();
+      final userBookings = await bookingsStream.first;
+
+      // Build conversation history
+      final conversationHistory = _messages
+          .skip(1)
+          .map((msg) => {
+                'role': msg.isUser ? 'user' : 'assistant',
+                'content': msg.text,
+              })
+          .toList();
+
+      // Get personalized response from chatbot with booking history
+      final response = await _chatbotService.sendPersonalizedRecommendation(
+          userBookings, conversationHistory);
+
+      setState(() {
+        _messages.add(ChatMessage(
+          text: response.text,
+          isUser: false,
+          timestamp: DateTime.now(),
+          recommendations: response.recommendations,
+        ));
+        _isLoading = false;
+      });
+    } catch (e) {
+      debugPrint('Error getting personalized recommendation: $e');
+      setState(() {
+        _messages.add(ChatMessage(
+          text: 'Sorry, I encountered an error getting your personalized recommendations. Please try again.',
+          isUser: false,
+          timestamp: DateTime.now(),
+        ));
+        _isLoading = false;
+      });
+    }
+
+    // Scroll to bottom
+    _scrollToBottom();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -147,6 +233,7 @@ class _ChatbotScreenState extends State<ChatbotScreen> with ConnectivityAware {
                     timestamp: DateTime.now(),
                   ),
                 );
+                _suggestionUsed = false; // Reset suggestion when chat is cleared
               });
             },
           ),
@@ -194,6 +281,46 @@ class _ChatbotScreenState extends State<ChatbotScreen> with ConnectivityAware {
                     ),
                   ),
                 ],
+              ),
+            ),
+
+          // Suggested message button (only shown if user has bookings)
+          if (_hasBookings && !_suggestionUsed && !_isLoading)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: GestureDetector(
+                onTap: _sendSuggestedMessage,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: AppColors.forestGreen.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: AppColors.forestGreen.withOpacity(0.3),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.lightbulb_outline,
+                        color: AppColors.forestGreen,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 8),
+                      Flexible(
+                        child: Text(
+                          'Based on my bookings, what would you recommend for me?',
+                          style: TextStyle(
+                            color: AppColors.forestGreen,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ),
 

@@ -104,6 +104,19 @@ class AppDatabase extends _$AppDatabase {
     return await select(experiences).get();
   }
 
+  /// Get experiences with pagination support
+  /// [limit] - Number of experiences to fetch
+  /// [offset] - Starting position for pagination
+  Future<List<Experience>> getExperiencesPaginated({
+    required int limit,
+    required int offset,
+  }) async {
+    return await (select(experiences)
+          ..orderBy([(e) => OrderingTerm.desc(e.createdAt)])
+          ..limit(limit, offset: offset))
+        .get();
+  }
+
   /// Get a single experience by ID
   Future<Experience?> getExperienceById(String id) async {
     return await (select(experiences)..where((e) => e.id.equals(id)))
@@ -246,7 +259,10 @@ class AppDatabase extends _$AppDatabase {
   Future<List<Message>> getMessagesForChat(String chatId) async {
     return await (select(messages)
           ..where((m) => m.chatId.equals(chatId))
-          ..orderBy([(m) => OrderingTerm(expression: m.createdAt, mode: OrderingMode.desc)]))
+          ..orderBy([
+            (m) =>
+                OrderingTerm(expression: m.createdAt, mode: OrderingMode.desc)
+          ]))
         .get();
   }
 
