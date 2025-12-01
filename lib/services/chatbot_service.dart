@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../models/experience.dart';
+import '../models/booking.dart';
 import 'experience_service.dart';
 
 /// Response model for chatbot interactions
@@ -256,7 +257,7 @@ class ChatbotService {
     return isSpanish ? _fallbackMessageSpanish : _fallbackMessage;
   }
 
-  /// Build the context string with all available experiences
+  /// Build the context string with all available experiences (includes ALL attributes)
   String _buildExperiencesContext(List<Experience> experiences) {
     final buffer = StringBuffer();
     buffer.writeln('Available Experiences:');
@@ -266,20 +267,216 @@ class ChatbotService {
       buffer.writeln('Experience ID: ${exp.id}');
       buffer.writeln('Title: ${exp.title}');
       buffer.writeln('Summary: ${exp.summary}');
+      buffer.writeln('Host ID: ${exp.hostId}');
+      buffer.writeln('Host Verified: ${exp.hostVerified}');
+      buffer.writeln('Location: (${exp.location.latitude}, ${exp.location.longitude})');
       buffer.writeln('Department: ${exp.department}');
-      buffer.writeln('Categories: ${exp.categories.join(", ")}');
-      buffer.writeln('Languages: ${exp.languages.join(", ")}');
+      buffer.writeln('Rating: ${exp.avgRating} (${exp.reviewsCount} reviews)');
+      buffer.writeln('Duration: ${exp.duration} hours');
       buffer.writeln('Skills to Learn: ${exp.skillsToLearn.join(", ")}');
       buffer.writeln('Skills to Teach: ${exp.skillsToTeach.join(", ")}');
-      buffer.writeln('Duration: ${exp.duration} hours');
+      buffer.writeln('Categories: ${exp.categories.join(", ")}');
+      buffer.writeln('Languages: ${exp.languages.join(", ")}');
+      buffer.writeln('Created At: ${exp.createdAt.toIso8601String()}');
       buffer.writeln('Price: \$${exp.priceCOP} COP');
       buffer.writeln('Group Size (max): ${exp.groupSizeMax}');
-      buffer.writeln('Rating: ${exp.avgRating} (${exp.reviewsCount} reviews)');
+      buffer.writeln('Payment Options: ${exp.paymentOptions.join(", ")}');
+      buffer.writeln('Accessibility Features: ${exp.accessibilityFeatures.join(", ")}');
       buffer.writeln('Active: ${exp.isActive}');
       buffer.writeln('---');
     }
 
     return buffer.toString();
+  }
+
+  /// Build context string for user's previous bookings with their experience details
+  Future<String> _buildBookingsContext(List<Booking> bookings) async {
+    if (bookings.isEmpty) {
+      debugPrint('No bookings found for user');
+      return '\n\nUser\'s Previous Bookings: None found. Please recommend popular experiences instead.';
+    }
+
+    final buffer = StringBuffer();
+    buffer.writeln('\n\nUser\'s Previous Bookings (showing experiences they have enjoyed):');
+    buffer.writeln();
+
+    int successfulBookings = 0;
+    for (var booking in bookings) {
+      try {
+        final experience = await _experienceService.getExperienceById(booking.experienceId);
+        if (experience != null) {
+          successfulBookings++;
+          buffer.writeln('Previously Booked Experience:');
+          buffer.writeln('  Experience ID: ${experience.id}');
+          buffer.writeln('  Title: ${experience.title}');
+          buffer.writeln('  Categories: ${experience.categories.join(", ")}');
+          buffer.writeln('  Department: ${experience.department}');
+          buffer.writeln('  Skills Learned: ${experience.skillsToLearn.join(", ")}');
+          buffer.writeln('  Languages: ${experience.languages.join(", ")}');
+          buffer.writeln('  Duration: ${experience.duration} hours');
+          buffer.writeln('  Price Paid: \$${booking.amountCOP} COP');
+          buffer.writeln('  People Count: ${booking.peopleCount}');
+          buffer.writeln('  Booking Status: ${booking.status}');
+          buffer.writeln('---');
+        }
+      } catch (e) {
+        debugPrint('Error fetching experience for booking: $e');
+      }
+    }
+
+    if (successfulBookings == 0) {
+      return '\n\nUser\'s Previous Bookings: Could not load booking details. Please recommend popular experiences instead.';
+    }
+
+    debugPrint('Built context for $successfulBookings bookings');
+
+    return buffer.toString();
+  }
+
+  /// Send a personalized recommendation message based on user's booking history
+  Future<ChatbotResponse> sendPersonalizedRecommendation(
+      List<Booking> userBookings,
+      List<Map<String, String>> conversationHistory) async {
+    try {
+      debugPrint('Starting personalized recommendation with ${userBookings.length} bookings');
+      
+      // Fetch all available experiences
+      final experiences = await _experienceService.getExperiences();
+      debugPrint('Fetched ${experiences.length} experiences');
+
+      // Create context with all experiences
+      final experiencesContext = _buildExperiencesContext(experiences);
+
+      // Build bookings context
+      final bookingsContext = await _buildBookingsContext(userBookings);
+      debugPrint('Bookings context length: ${bookingsContext.length} chars');
+
+      // Create the personalized recommendation message
+      const userMessage = 'Based on my previous bookings, what experience would you recommend for me? I\'m looking for something similar to what I\'ve enjoyed before.';
+
+      // Build messages with booking context included in system message
+      final messages = _buildMessagesWithBookings(
+          userMessage, experiencesContext, bookingsContext, conversationHistory);
+
+      // Build request body with higher token limit for complex responses
+      final requestBody = jsonEncode({
+        'model': 'openai/gpt-oss-120b',
+        'messages': messages,
+        'temperature': 0.7,
+        'top_p': 1,
+        'max_tokens': 2048,
+        'stream': false,
+      });
+
+      debugPrint('Sending personalized recommendation request...');
+
+      // Make API call to NVIDIA
+      final request = http.Request('POST', Uri.parse(_apiUrl));
+      request.headers['accept'] = 'application/json';
+      request.headers['content-type'] = 'application/json';
+      request.headers['authorization'] = 'Bearer $_apiKey';
+      request.body = requestBody;
+
+      final streamedResponse = await request.send().timeout(
+        const Duration(seconds: 45),
+        onTimeout: () {
+          throw Exception(
+              'Connection timeout - Please check your internet connection');
+        },
+      );
+      final response = await http.Response.fromStream(streamedResponse);
+
+      debugPrint('API Response status: ${response.statusCode}');
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+
+        if (data == null ||
+            data['choices'] == null ||
+            data['choices'].isEmpty ||
+            data['choices'][0]['message'] == null ||
+            data['choices'][0]['message']['content'] == null) {
+          debugPrint('Invalid API response structure: $data');
+          return ChatbotResponse(
+            text: 'I\'d love to give you personalized recommendations! Based on your bookings, I suggest exploring experiences in similar categories. What type of experience interests you most - cultural, outdoor, or culinary?',
+            recommendations: [],
+          );
+        }
+
+        final aiResponse = data['choices'][0]['message']['content'] as String;
+        debugPrint('AI Response length: ${aiResponse.length} chars');
+
+        if (aiResponse.trim().isEmpty) {
+          debugPrint('AI returned empty response');
+          return ChatbotResponse(
+            text: 'Based on your booking history, I can help you find similar experiences! What aspects did you enjoy most - the location, the activities, or the cultural exchange?',
+            recommendations: [],
+          );
+        }
+
+        return _parseResponse(aiResponse, experiences, userMessage);
+      } else {
+        debugPrint('API Error: ${response.statusCode} - ${response.body}');
+        return ChatbotResponse(
+          text:
+              'Sorry, I encountered an error getting personalized recommendations. Please try again or ask me about specific types of experiences you\'re interested in.',
+          recommendations: [],
+        );
+      }
+    } catch (e, stackTrace) {
+      debugPrint('Error in personalized recommendation: $e');
+      debugPrint('Stack trace: $stackTrace');
+      return ChatbotResponse(
+        text:
+            'I had trouble loading your personalized recommendations. You can try asking me about specific types of experiences like "outdoor adventures" or "cultural workshops".',
+        recommendations: [],
+      );
+    }
+  }
+
+  /// Build messages array with booking history context for personalized recommendations
+  List<Map<String, String>> _buildMessagesWithBookings(
+    String userMessage,
+    String experiencesContext,
+    String bookingsContext,
+    List<Map<String, String>> conversationHistory,
+  ) {
+    final messages = <Map<String, String>>[
+      {
+        'role': 'system',
+        'content':
+            '''You are TravelConnect's personalized recommendation assistant. Analyze the user's booking history and suggest NEW experiences they would enjoy.
+
+INSTRUCTIONS:
+1. Look at their previous bookings to understand preferences (categories, location, price range, skills)
+2. Recommend 2-3 DIFFERENT experiences (not ones they already booked)
+3. Explain why each matches their interests based on booking history
+4. Respond in the same language as the user
+
+$bookingsContext
+
+Available Experiences:
+$experiencesContext
+
+FORMAT each recommendation EXACTLY like this:
+Experience ID: [actual_id]
+Title: [title]
+[2-3 sentences explaining why this matches their booking history]
+
+Only recommend active experiences (Active: true). Be friendly and personal.'''
+      },
+    ];
+
+    // Add conversation history
+    messages.addAll(conversationHistory);
+
+    // Add current user message
+    messages.add({
+      'role': 'user',
+      'content': userMessage,
+    });
+
+    return messages;
   }
 
   /// Build the messages array for the API call

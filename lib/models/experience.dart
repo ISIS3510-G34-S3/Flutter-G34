@@ -126,7 +126,8 @@ class Experience {
       paymentOptions: parseStringList(data['paymentOptions'], 'paymentOptions'),
       images: parseStringList(data['images'], 'images'),
       isActive: parseBool(data['isActive'], false),
-      accessibilityFeatures: parseStringList(data['accessibilityFeatures'], 'accessibilityFeatures'),
+      accessibilityFeatures: parseStringList(
+          data['accessibilityFeatures'], 'accessibilityFeatures'),
     );
   }
 
@@ -143,4 +144,18 @@ class Experience {
     }
     return null;
   }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is Experience &&
+          runtimeType == other.runtimeType &&
+          id == other.id &&
+          title == other.title &&
+          avgRating == other.avgRating &&
+          priceCOP == other.priceCOP;
+
+  @override
+  int get hashCode =>
+      id.hashCode ^ title.hashCode ^ avgRating.hashCode ^ priceCOP.hashCode;
 }

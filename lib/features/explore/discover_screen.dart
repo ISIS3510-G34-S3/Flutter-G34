@@ -21,6 +21,7 @@ class DiscoverScreen extends StatefulWidget {
 class _DiscoverScreenState extends State<DiscoverScreen>
     with ConnectivityAware {
   final _searchController = TextEditingController();
+  final _scrollController = ScrollController();
   late DiscoverViewModel _viewModel;
   Timer? _debounce;
 
@@ -30,6 +31,7 @@ class _DiscoverScreenState extends State<DiscoverScreen>
     _viewModel = DiscoverViewModel();
     _viewModel.initialize();
     _viewModel.addListener(_onViewModelChanged);
+    _scrollController.addListener(_onScroll);
   }
 
   void _onViewModelChanged() {
@@ -38,9 +40,19 @@ class _DiscoverScreenState extends State<DiscoverScreen>
     }
   }
 
+  /// Detect when user scrolls near bottom to load more
+  void _onScroll() {
+    if (_scrollController.position.pixels >=
+        _scrollController.position.maxScrollExtent - 200) {
+      // Load more when 200px from bottom
+      _viewModel.loadMoreExperiences();
+    }
+  }
+
   @override
   void dispose() {
     _searchController.dispose();
+    _scrollController.dispose();
     _debounce?.cancel();
     _viewModel.removeListener(_onViewModelChanged);
     _viewModel.dispose();
@@ -124,7 +136,7 @@ class _DiscoverScreenState extends State<DiscoverScreen>
   Widget _buildSearchSection() {
     return Container(
       color: AppColors.white,
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(16.0),
       child: Column(
         children: [
           // Search field
@@ -221,6 +233,10 @@ class _DiscoverScreenState extends State<DiscoverScreen>
       return _buildEmptyState();
     }
 
+    // Calculate item count: experiences + loading indicator (if loading more)
+    final itemCount = _viewModel.filteredExperiences.length +
+        (_viewModel.hasMoreData ? 1 : 0);
+
     return RefreshIndicator(
       onRefresh: () async {
         debugPrint('👆 User pulled down to refresh');
@@ -229,11 +245,20 @@ class _DiscoverScreenState extends State<DiscoverScreen>
       },
       color: AppColors.forestGreen,
       child: ListView.builder(
-        key: ObjectKey(_viewModel.filteredExperiences),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        key: ObjectKey(_viewModel.filteredExperiences.length),
+        controller: _scrollController,
+        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
         physics: const AlwaysScrollableScrollPhysics(),
-        itemCount: _viewModel.filteredExperiences.length,
+        addAutomaticKeepAlives: true,
+        addRepaintBoundaries: true,
+        cacheExtent: 500.0,
+        itemCount: itemCount,
         itemBuilder: (context, index) {
+          // Show loading indicator at the bottom
+          if (index >= _viewModel.filteredExperiences.length) {
+            return _buildLoadingIndicator();
+          }
+
           final experience = _viewModel.filteredExperiences[index];
           return Padding(
             padding: const EdgeInsets.only(bottom: 16),
@@ -244,6 +269,37 @@ class _DiscoverScreenState extends State<DiscoverScreen>
             ),
           );
         },
+      ),
+    );
+  }
+
+  /// Loading indicator shown at bottom during pagination
+  Widget _buildLoadingIndicator() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 16.0),
+      child: Center(
+        child: _viewModel.isLoadingMore
+            ? Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: AppColors.forestGreen,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Loading more experiences...',
+                    style: AppTypography.bodySmall.copyWith(
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ],
+              )
+            : const SizedBox.shrink(),
       ),
     );
   }
