@@ -12,6 +12,7 @@ class DiscoverViewModel extends ChangeNotifier {
   final Location _location = Location();
   final Connectivity _connectivity = Connectivity();
   StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
+  Timer? _connectivityDebounce;
 
   // State
   List<Experience> _allExperiences = [];
@@ -66,16 +67,20 @@ class DiscoverViewModel extends ChangeNotifier {
   void _setupConnectivityListener() {
     _connectivitySubscription = _connectivity.onConnectivityChanged.listen(
       (List<ConnectivityResult> results) {
-        final wasOnline = _isOnline;
-        _isOnline = !results.contains(ConnectivityResult.none);
+        // Debounce connectivity changes to avoid rapid rebuilds
+        _connectivityDebounce?.cancel();
+        _connectivityDebounce = Timer(const Duration(milliseconds: 500), () {
+          final wasOnline = _isOnline;
+          _isOnline = !results.contains(ConnectivityResult.none);
 
-        // If we just came back online, refresh data
-        if (!wasOnline && _isOnline) {
-          debugPrint('Connection restored, refreshing data...');
-          fetchExperiences(forceRefresh: true);
-        }
-
-        notifyListeners();
+          // If we just came back online, refresh data
+          if (!wasOnline && _isOnline) {
+            debugPrint('Connection restored, refreshing data...');
+            fetchExperiences(forceRefresh: true);
+          } else {
+            notifyListeners();
+          }
+        });
       },
     );
   }
@@ -157,10 +162,11 @@ class DiscoverViewModel extends ChangeNotifier {
 
     // Filter by search query
     if (_searchQuery.isNotEmpty) {
+      final lowerQuery = _searchQuery.toLowerCase();
       experiences = experiences
           .where((exp) =>
-              exp.title.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-              exp.summary.toLowerCase().contains(_searchQuery.toLowerCase()))
+              exp.title.toLowerCase().contains(lowerQuery) ||
+              exp.summary.toLowerCase().contains(lowerQuery))
           .toList();
     }
 
@@ -195,23 +201,24 @@ class DiscoverViewModel extends ChangeNotifier {
           .toList();
     }
 
-    // Sort by distance if location is available
+    // Sort by distance if location is available (cache distance calculations)
     if (_currentLocation != null) {
-      experiences.sort((a, b) {
-        final distanceA = _calculateHaversineDistance(
-          _currentLocation!.latitude!,
-          _currentLocation!.longitude!,
-          a.location.latitude,
-          a.location.longitude,
+      final userLat = _currentLocation!.latitude!;
+      final userLon = _currentLocation!.longitude!;
+
+      // Pre-calculate distances to avoid redundant calculations
+      final experiencesWithDistance = experiences.map((exp) {
+        final distance = _calculateHaversineDistance(
+          userLat,
+          userLon,
+          exp.location.latitude,
+          exp.location.longitude,
         );
-        final distanceB = _calculateHaversineDistance(
-          _currentLocation!.latitude!,
-          _currentLocation!.longitude!,
-          b.location.latitude,
-          b.location.longitude,
-        );
-        return distanceA.compareTo(distanceB);
-      });
+        return MapEntry(exp, distance);
+      }).toList();
+
+      experiencesWithDistance.sort((a, b) => a.value.compareTo(b.value));
+      experiences = experiencesWithDistance.map((e) => e.key).toList();
     }
 
     // Create a new list instance to ensure change detection
@@ -299,6 +306,7 @@ class DiscoverViewModel extends ChangeNotifier {
   @override
   void dispose() {
     _connectivitySubscription?.cancel();
+    _connectivityDebounce?.cancel();
     super.dispose();
   }
 }

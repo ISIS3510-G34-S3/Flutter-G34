@@ -124,7 +124,7 @@ class _DiscoverScreenState extends State<DiscoverScreen>
   Widget _buildSearchSection() {
     return Container(
       color: AppColors.white,
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(16.0),
       child: Column(
         children: [
           // Search field
@@ -230,8 +230,11 @@ class _DiscoverScreenState extends State<DiscoverScreen>
       color: AppColors.forestGreen,
       child: ListView.builder(
         key: ObjectKey(_viewModel.filteredExperiences),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
         physics: const AlwaysScrollableScrollPhysics(),
+        addAutomaticKeepAlives: true,
+        addRepaintBoundaries: true,
+        cacheExtent: 500.0,
         itemCount: _viewModel.filteredExperiences.length,
         itemBuilder: (context, index) {
           final experience = _viewModel.filteredExperiences[index];
